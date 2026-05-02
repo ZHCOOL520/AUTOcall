@@ -1,0 +1,58 @@
+# 自动电话拨打系统 - 使用说明
+
+## 功能说明
+本应用可以自动拨打表格中的电话号码，并在接通后播放指定的语音文件。
+
+## 使用步骤
+
+### 1. 准备语音文件
+- 将语音文件（MP3格式）命名为 `audio1.mp3`, `audio2.mp3` 等
+- 将语音文件放置到手机的以下目录：
+  ```
+  /Android/data/com.example.autocall/files/
+  ```
+
+### 2. 修改电话列表
+在 `AutoCallViewModel.kt` 的 `initializeSampleData()` 方法中修改电话数据：
+
+```kotlin
+val sampleList = listOf(
+    PhoneEntry(
+        phoneNumber = "你的电话号码",      // 必填
+        contactName = "联系人姓名",         // 可选
+        audioFilePath = getAudioPath(context, "audio1.mp3")  // 可选，无语音则传null
+    ),
+    // 添加更多电话...
+)
+```
+
+### 3. 从CSV/Excel导入（可选）
+如果需要从表格文件导入，可以：
+1. 将CSV/Excel文件转换为PhoneEntry列表
+2. 调用 `viewModel.setPhoneList(yourList)`
+
+### 4. 运行应用
+1. 安装应用到手机
+2. 授予拨打电话和存储权限
+3. 点击"开始拨打"按钮
+
+## 注意事项
+
+⚠️ **重要提示：**
+1. 确保手机已插入SIM卡并可以正常拨打电话
+2. 首次使用需要授予相关权限
+3. 语音文件必须是有效的音频格式（推荐MP3）
+4. 每个电话之间默认间隔8秒（5秒等待接通 + 3秒间隔）
+5. 可以在代码中调整等待时间
+
+## 自定义配置
+
+在 `AutoCallViewModel.kt` 中可以调整：
+- 电话接通等待时间：修改 `delay(5000)` 的值（单位：毫秒）
+- 电话间隔时间：修改 `delay(3000)` 的值
+- 语音文件路径：修改 `getAudioPath()` 方法
+
+## 权限说明
+应用需要以下权限：
+- `CALL_PHONE`: 拨打电话
+- `READ_EXTERNAL_STORAGE` / `READ_MEDIA_AUDIO`: 读取语音文件
