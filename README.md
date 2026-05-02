@@ -41,6 +41,9 @@
 <img width="108" height="240" alt="ac" src="https://github.com/user-attachments/assets/fcb7fdaf-d2b5-4a27-bcef-9cf57d751d72" />
 
 ---
+## ⚠️ 已知问题
+中断通话，音频继续播放
+---
 
 ## ⚠️ 合规与使用声明
 本项目**仅可用于合法合规场景**，例如企业内部通知、物业提醒、正规业务回访等。
