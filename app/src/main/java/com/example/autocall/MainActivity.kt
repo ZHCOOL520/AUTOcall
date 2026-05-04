@@ -2,6 +2,8 @@ package com.example.autocall
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -89,6 +91,7 @@ class MainActivity : ComponentActivity() {
                         viewModel = viewModel,
                         onImportFile = { openDocumentLauncher.launch("*/*") },
                         onImportAudio = { importAudioLauncher.launch("audio/*") },
+                        onImportClipboard = { importFromClipboard() },
                         onExport = {
                             val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                             exportLauncher.launch("call_records_$ts.csv")
@@ -148,6 +151,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun importFromClipboard() {
+        try {
+            val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            if (clipboardManager.hasPrimaryClip()) {
+                val clipData = clipboardManager.primaryClip
+                if (clipData != null && clipData.itemCount > 0) {
+                    val clipboardText = clipData.getItemAt(0).text?.toString() ?: ""
+                    if (clipboardText.isNotBlank()) {
+                        viewModel.importFromClipboard(this, clipboardText)
+                    } else {
+                        viewModel.updateStatus("剪贴板内容为空")
+                    }
+                } else {
+                    viewModel.updateStatus("剪贴板无内容")
+                }
+            } else {
+                viewModel.updateStatus("剪贴板为空")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            viewModel.updateStatus("读取剪贴板失败: ${e.message}")
+        }
+    }
+
     private fun getFileNameFromUri(uri: Uri): String {
         return contentResolver.query(uri, null, null, null, null)?.use { cursor ->
             val col = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
@@ -163,7 +190,8 @@ fun MainScreen(
     viewModel: AutoCallViewModel,
     onImportFile: () -> Unit,
     onImportAudio: () -> Unit,
-    onExport: () -> Unit
+    onExport: () -> Unit,
+    onImportClipboard: () -> Unit
 ) {
     val context = LocalContext.current
     val phoneList by viewModel.phoneList.collectAsState()
@@ -364,7 +392,7 @@ fun MainScreen(
                     Text("自动电话拨打系统")
 
                     Text(
-                        text = "版本: 2.0.0",
+                        text = "版本: 2.1.0",
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/coolzhang6666/AUTOcall"))
@@ -391,7 +419,7 @@ fun MainScreen(
                 }
             },
             confirmButton = {
-                Button(onClick = { }) { Text("确定") }
+                Button(onClick = { showAboutDialog = false }) { Text("确定") }
             }
         )
     }
@@ -655,7 +683,7 @@ fun ControlButtons(
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onImportFile, enabled = !isRunning, modifier = Modifier.weight(1f)) {
-                Text("导入表格")
+                Text("导入电话")
             }
             Button(onClick = onImportAudio, enabled = !isRunning, modifier = Modifier.weight(1f)) {
                 Text("导入音频")

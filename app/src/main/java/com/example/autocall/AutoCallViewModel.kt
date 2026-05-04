@@ -321,11 +321,26 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 
                 // 检测列标题
                 if (firstRow.isNotEmpty()) {
-                    val phoneKeywords = listOf("电话", "手机", "手机号", "phone", "tel")
-                    val nameKeywords = listOf("姓名", "联系人", "name", "contact")
-                    val audioKeywords = listOf("语音", "音频", "audio", "voice")
-                    val accountNumberKeywords = listOf("户号", "账号", "账户", "account")
-                    val balanceKeywords = listOf("余额", "金额", "balance")
+                    val phoneKeywords = listOf(
+                        "电话", "手机", "手机号", "联系方式", "联系电话", "号码", "电话号码",
+                        "phone", "tel", "telephone", "mobile", "cell"
+                    )
+                    val nameKeywords = listOf(
+                        "姓名", "联系人", "名字", "称呼", "用户名", "客户",
+                        "name", "contact", "person", "username", "customer"
+                    )
+                    val audioKeywords = listOf(
+                        "语音", "音频", "录音", "文件", "语音文件",
+                        "audio", "voice", "sound", "file", "recording"
+                    )
+                    val accountNumberKeywords = listOf(
+                        "户号", "账号", "账户", "用户id", "客户编号",
+                        "account", "account number", "user id", "customer_id"
+                    )
+                    val balanceKeywords = listOf(
+                        "余额", "金额", "余额(元)", "账户余额", "剩余金额",
+                        "balance", "amount", "money", "fund"
+                    )
                     
                     for ((index, header) in firstRow.withIndex()) {
                         val lowerHeader = header.lowercase()
@@ -362,13 +377,74 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun importFromClipboard(context: Context, clipboardText: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (clipboardText.isBlank()) {
+                    withContext(Dispatchers.Main) { _currentStatus.value = "剪贴板内容为空" }
+                    return@launch
+                }
+                
+                val phoneList = mutableListOf<PhoneEntry>()
+                
+                // 按行分割文本
+                val lines = clipboardText.split(Regex("[\r\n]+"))
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                
+                for (line in lines) {
+                    // 尝试从每一行中提取电话号码
+                    val phone = extractPhoneNumber(line)
+                    if (!phone.isNullOrEmpty()) {
+                        // 检查是否已存在相同号码
+                        if (phoneList.none { it.phoneNumber == phone }) {
+                            phoneList.add(PhoneEntry(phoneNumber = phone))
+                        }
+                    }
+                }
+                
+                if (phoneList.isEmpty()) {
+                    withContext(Dispatchers.Main) { _currentStatus.value = "未在剪贴板中找到有效电话号码" }
+                    return@launch
+                }
+                
+                withContext(Dispatchers.Main) {
+                    // 追加到现有列表，而不是替换
+                    val currentList = _phoneList.value.toMutableList()
+                    currentList.addAll(phoneList)
+                    _phoneList.value = currentList
+                    _currentStatus.value = "从剪贴板导入 ${phoneList.size} 个电话"
+                    saveData()
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "从剪贴板导入失败: ${e.message}")
+                withContext(Dispatchers.Main) { _currentStatus.value = "导入失败: ${e.message}" }
+            }
+        }
+    }
+
     private fun detectColumnHeaders(row: Row): Map<String, Int> {
         val map = mutableMapOf<String, Int>()
-        val phoneKeywords = listOf("电话", "手机", "手机号", "联系方式", "联系电话", "号码", "phone", "tel", "telephone", "mobile", "cell")
-        val nameKeywords = listOf("姓名", "联系人", "名字", "称呼", "name", "contact", "person")
-        val audioKeywords = listOf("语音", "音频", "录音", "文件", "audio", "voice", "sound", "file")
-        val accountNumberKeywords = listOf("户号", "账号", "账户", "account", "account number", "user id")
-        val balanceKeywords = listOf("余额", "金额", "余额(元)", "balance", "amount", "money")
+        val phoneKeywords = listOf(
+            "电话", "手机", "手机号", "联系方式", "联系电话", "号码", "电话号码", "联系号码",
+            "phone", "tel", "telephone", "mobile", "cell", "phonenumber", "contact_number"
+        )
+        val nameKeywords = listOf(
+            "姓名", "联系人", "名字", "称呼", "用户名", "客户", "客户名称",
+            "name", "contact", "person", "username", "customer"
+        )
+        val audioKeywords = listOf(
+            "语音", "音频", "录音", "文件", "语音文件", "音频文件",
+            "audio", "voice", "sound", "file", "recording", "media"
+        )
+        val accountNumberKeywords = listOf(
+            "户号", "账号", "账户", "用户id", "客户编号", "账户号",
+            "account", "account number", "user id", "account_id", "customer_id"
+        )
+        val balanceKeywords = listOf(
+            "余额", "金额", "余额(元)", "账户余额", "剩余金额", "钱",
+            "balance", "amount", "money", "fund", "remaining"
+        )
         for (i in 0 until row.physicalNumberOfCells) {
             val cellValue = row.getCell(i)?.toString()?.trim()?.lowercase() ?: continue
             if (phoneKeywords.any { it in cellValue }) map["phone"] = i
@@ -382,23 +458,95 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     private fun extractPhoneNumber(value: String?): String? {
         if (value.isNullOrEmpty()) return null
+        
+        // 第一步：基础清理 - 去除所有非数字和+号字符
         var cleaned = value.replace(Regex("[^0-9+]"), "")
+        
+        // 第二步：处理国家代码
+        // 去除+86或86前缀（中国大陆）
         if (cleaned.startsWith("+86")) cleaned = cleaned.substring(3)
         else if (cleaned.startsWith("86") && cleaned.length > 11) cleaned = cleaned.substring(2)
-        else if (cleaned.startsWith("0") && cleaned.length == 12) cleaned = cleaned.substring(1)
-        if (cleaned.matches(Regex("^1[3-9]\\d{9}$")) || cleaned.matches(Regex("^0\\d{2,3}\\d{7,8}$")) || cleaned.matches(Regex("^\\d{7,15}$")))
-            return cleaned
-        return cleaned.ifEmpty { null }
+        // 去除其他常见国际区号
+        else if (cleaned.startsWith("+852")) cleaned = cleaned.substring(4) // 香港
+        else if (cleaned.startsWith("+853")) cleaned = cleaned.substring(4) // 澳门
+        else if (cleaned.startsWith("+886")) cleaned = cleaned.substring(4) // 台湾
+        else if (cleaned.startsWith("+1")) cleaned = cleaned.substring(2) // 美国/加拿大
+        else if (cleaned.startsWith("+44")) cleaned = cleaned.substring(3) // 英国
+        else if (cleaned.startsWith("+81")) cleaned = cleaned.substring(3) // 日本
+        else if (cleaned.startsWith("+82")) cleaned = cleaned.substring(3) // 韩国
+        
+        // 第三步：处理国内长途前缀0
+        if (cleaned.startsWith("0") && cleaned.length in 11..12) cleaned = cleaned.substring(1)
+        
+        // 第四步：验证并返回有效号码
+        return when {
+            // 中国大陆手机号：1开头的11位数字
+            cleaned.matches(Regex("^1[3-9]\\d{9}$")) -> cleaned
+            // 中国大陆固话：区号(3-4位)+号码(7-8位)
+            cleaned.matches(Regex("^0\\d{2,3}\\d{7,8}$")) -> cleaned
+            // 短号码：5-6位（如客服热线）
+            cleaned.matches(Regex("^[1-9]\\d{4,5}$")) -> cleaned
+            // 普通固话号码：7-8位
+            cleaned.matches(Regex("^\\d{7,8}$")) -> cleaned
+            // 其他合法号码：7-15位（符合ITU-T E.164标准）
+            cleaned.matches(Regex("^\\d{7,15}$")) -> cleaned
+            // 尝试从原始字符串中提取可能的号码片段
+            else -> {
+                // 如果清理后不符合标准格式，尝试从原始文本中提取数字序列
+                val numberSequences = value.split(Regex("[^0-9]+"))
+                    .filter { it.isNotEmpty() }
+                    .map { it.trim() }
+                
+                // 优先返回最可能的号码（长度在7-15之间）
+                numberSequences.firstOrNull { it.length in 7..15 }?.let { candidate ->
+                    // 再次验证候选号码
+                    if (candidate.matches(Regex("^1[3-9]\\d{9}$")) || 
+                        candidate.matches(Regex("^0?\\d{7,12}$"))) {
+                        // 去除前导0
+                        if (candidate.startsWith("0") && candidate.length > 10) {
+                            candidate.substring(1)
+                        } else {
+                            candidate
+                        }
+                    } else null
+                }
+            }
+        }
     }
 
     private fun getCellValue(cell: Cell?): String? {
         if (cell == null) return null
         return when (cell.cellType) {
             CellType.STRING -> cell.stringCellValue
-            CellType.NUMERIC -> if (DateUtil.isCellDateFormatted(cell)) cell.dateCellValue.toString()
-            else cell.numericCellValue.toLong().toString()
+            CellType.NUMERIC -> {
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    // 日期格式
+                    cell.dateCellValue.toString()
+                } else {
+                    // 数字格式 - 保留原始格式，避免科学计数法
+                    val numericValue = cell.numericCellValue
+                    // 如果是整数，不显示小数点
+                    if (numericValue == numericValue.toLong().toDouble()) {
+                        numericValue.toLong().toString()
+                    } else {
+                        // 浮点数，保留2位小数
+                        String.format("%.2f", numericValue)
+                    }
+                }
+            }
             CellType.BOOLEAN -> cell.booleanCellValue.toString()
-            CellType.FORMULA -> cell.cellFormula
+            CellType.FORMULA -> {
+                // 尝试获取公式计算结果
+                try {
+                    when (cell.cachedFormulaResultType) {
+                        CellType.STRING -> cell.stringCellValue
+                        CellType.NUMERIC -> cell.numericCellValue.toString()
+                        else -> cell.cellFormula
+                    }
+                } catch (e: Exception) {
+                    cell.cellFormula
+                }
+            }
             else -> null
         }
     }
