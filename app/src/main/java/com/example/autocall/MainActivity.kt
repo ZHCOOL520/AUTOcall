@@ -1,5 +1,4 @@
 package com.example.autocall
-
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ClipboardManager
@@ -15,7 +14,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -23,19 +31,52 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.autocall.ui.theme.AUTOCallTheme
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
@@ -67,6 +108,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun importFromClipboard() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        if (clipboard.hasPrimaryClip()) {
+            val clipData = clipboard.primaryClip
+            if (clipData != null && clipData.itemCount > 0) {
+                val text = clipData.getItemAt(0).text?.toString()
+                if (!text.isNullOrEmpty()) {
+                    viewModel.importFromClipboard(this, text)
+                } else {
+                    viewModel.updateStatus("剪贴板内容为空")
+                }
+            }
+        } else {
+            viewModel.updateStatus("剪贴板无内容")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -87,16 +145,29 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    MainScreen(
-                        viewModel = viewModel,
-                        onImportFile = { openDocumentLauncher.launch("*/*") },
-                        onImportAudio = { importAudioLauncher.launch("audio/*") },
-                        onImportClipboard = { importFromClipboard() },
-                        onExport = {
-                            val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                            exportLauncher.launch("call_records_$ts.csv")
+                    val navController = rememberNavController()
+                    NavHost(navController = navController, startDestination = "main") {
+                        composable("main") {
+                            MainScreen(
+                                viewModel = viewModel,
+                                onImportFile = { openDocumentLauncher.launch("*/*") },
+                                onImportAudio = { importAudioLauncher.launch("audio/*") },
+                                onExport = {
+                                    val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                    exportLauncher.launch("call_records_$ts.csv")
+                                },
+                                onImportClipboard = { importFromClipboard() },
+                                onNavigateToSettings = { navController.navigate("settings") }
+                            )
                         }
-                    )
+                        composable("settings") {
+                            SettingsScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onImportAudio = { importAudioLauncher.launch("audio/*") }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -151,30 +222,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun importFromClipboard() {
-        try {
-            val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            if (clipboardManager.hasPrimaryClip()) {
-                val clipData = clipboardManager.primaryClip
-                if (clipData != null && clipData.itemCount > 0) {
-                    val clipboardText = clipData.getItemAt(0).text?.toString() ?: ""
-                    if (clipboardText.isNotBlank()) {
-                        viewModel.importFromClipboard(this, clipboardText)
-                    } else {
-                        viewModel.updateStatus("剪贴板内容为空")
-                    }
-                } else {
-                    viewModel.updateStatus("剪贴板无内容")
-                }
-            } else {
-                viewModel.updateStatus("剪贴板为空")
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            viewModel.updateStatus("读取剪贴板失败: ${e.message}")
-        }
-    }
-
     private fun getFileNameFromUri(uri: Uri): String {
         return contentResolver.query(uri, null, null, null, null)?.use { cursor ->
             val col = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
@@ -191,7 +238,8 @@ fun MainScreen(
     onImportFile: () -> Unit,
     onImportAudio: () -> Unit,
     onExport: () -> Unit,
-    onImportClipboard: () -> Unit
+    onImportClipboard: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val context = LocalContext.current
     val phoneList by viewModel.phoneList.collectAsState()
@@ -200,11 +248,8 @@ fun MainScreen(
     val progress by viewModel.progress.collectAsState()
     val selectedAudioIndex by viewModel.selectedAudioIndex.collectAsState()
     val statistics by viewModel.statistics.collectAsState()
-    val isRecordingEnabled by viewModel.isRecordingEnabled.collectAsState()
-    val isAudioPlaybackEnabled by viewModel.isAudioPlaybackEnabled.collectAsState()
     val sortByBalance by viewModel.sortByBalance.collectAsState()
     val sortByCallCount by viewModel.sortByCallCount.collectAsState()
-    val currentIndex by viewModel.currentIndex.collectAsState()
     val isPaused by viewModel.isPaused.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
@@ -218,10 +263,15 @@ fun MainScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("自动电话拨打系统") },
+                title = { 
+                    Text(
+                        "自动电话拨打系统",
+                        modifier = Modifier.clickable { showAboutDialog = true }
+                    ) 
+                },
                 actions = {
-                    IconButton(onClick = { showAboutDialog = true }) {
-                        Icon(Icons.Default.Info, contentDescription = "关于")
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "设置")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -245,25 +295,6 @@ fun MainScreen(
             ) {
                 StatusCard(status = currentStatus, progress = progress, total = phoneList.size)
 
-                AudioPlaybackSwitch(
-                    isEnabled = isAudioPlaybackEnabled,
-                    onToggle = { viewModel.toggleAudioPlayback() },
-                    currentStatus = currentStatus
-                )
-
-                if (isAudioPlaybackEnabled) {
-                    AudioSelector(
-                        viewModel = viewModel,
-                        selectedIndex = selectedAudioIndex
-                    )
-                }
-
-                RecordingSwitch(
-                    isEnabled = isRecordingEnabled,
-                    onToggle = { viewModel.toggleRecording() },
-                    currentStatus = currentStatus
-                )
-
                 ControlButtons(
                     isRunning = isRunning,
                     isPaused = isPaused,
@@ -272,7 +303,7 @@ fun MainScreen(
                     onResume = { viewModel.resumeAutoCall(context) },
                     onStop = { viewModel.stopAutoCall() },
                     onImportFile = onImportFile,
-                    onImportAudio = onImportAudio
+                    onImportClipboard = onImportClipboard
                 )
 
                 Text(
@@ -390,14 +421,17 @@ fun MainScreen(
 
     if (showAboutDialog) {
         AlertDialog(
-            onDismissRequest = { },
+            onDismissRequest = { showAboutDialog = false },
             title = { Text("关于软件") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("自动电话拨打系统")
-
+                    Text("自动电话拨打系统", fontWeight = FontWeight.Bold)
+                    Text("版本: 3.0.0")
+                    Text("开发者: ZHCOOL520")
+                    
+                    Text("\n相关链接：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
                     Text(
-                        text = "版本: 2.1.1",
+                        text = "• GitHub: https://github.com/ZHCOOL520/AUTOcall",
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ZHCOOL520/AUTOcall"))
@@ -405,9 +439,8 @@ fun MainScreen(
                             context.startActivity(intent)
                         }
                     )
-
                     Text(
-                        text = "开发者: ZHCOOL520",
+                        text = "• Bilibili: https://space.bilibili.com/1414910921",
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://space.bilibili.com/1414910921?spm_id_from=333.1007.0.0"))
@@ -415,18 +448,145 @@ fun MainScreen(
                             context.startActivity(intent)
                         }
                     )
-
-                    Text("\n功能说明：")
-                    Text("• 支持Excel/CSV文件导入联系人")
-                    Text("• 自动拨打电话并播放语音")
-                    Text("• 支持通话录音")
-                    Text("• 导出通话记录统计")
                 }
             },
             confirmButton = {
                 Button(onClick = { showAboutDialog = false }) { Text("确定") }
             }
         )
+    }
+}
+
+@SuppressLint("UseKtx")
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(
+    viewModel: AutoCallViewModel,
+    onBack: () -> Unit,
+    onImportAudio: () -> Unit
+) {
+    val context = LocalContext.current
+    val currentStatus by viewModel.currentStatus.collectAsState()
+    val isRecordingEnabled by viewModel.isRecordingEnabled.collectAsState()
+    val isAudioPlaybackEnabled by viewModel.isAudioPlaybackEnabled.collectAsState()
+    val selectedAudioIndex by viewModel.selectedAudioIndex.collectAsState()
+    val simCardMode by viewModel.simCardMode.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("设置") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 音频播放开关
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isAudioPlaybackEnabled) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("音频播放", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isAudioPlaybackEnabled) "✅ 开启：通话时自动播放音频" else "❌ 关闭：不播放音频",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Switch(
+                        checked = isAudioPlaybackEnabled,
+                        onCheckedChange = { viewModel.toggleAudioPlayback() }
+                    )
+                }
+            }
+
+            // 音频选择器（仅在开启时显示）
+            if (isAudioPlaybackEnabled) {
+                AudioSelector(
+                    viewModel = viewModel,
+                    selectedIndex = selectedAudioIndex,
+                    onImportAudio = onImportAudio
+                )
+            }
+
+            // 通话录音开关
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isRecordingEnabled) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("通话录音", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isRecordingEnabled) "✅ 开启：通话时自动录音" else "❌ 关闭：不录音",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        if (currentStatus.contains("录音", ignoreCase = true)) {
+                            Text(
+                                "状态: $currentStatus",
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary)
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isRecordingEnabled,
+                        onCheckedChange = { viewModel.toggleRecording() }
+                    )
+                }
+            }
+
+            // SIM卡选择
+            SimCardSelector(
+                simCardMode = simCardMode,
+                onModeSelected = { mode -> viewModel.setSimCardMode(mode) }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // 功能说明
+            Text("功能说明：", fontWeight = FontWeight.Bold)
+            Text("• 支持Excel/CSV文件导入联系人")
+            Text("• 自动拨打电话并播放语音")
+            Text("• 支持通话录音")
+            Text("• 导出通话记录统计")
+            Text("• 支持剪贴板导入电话号码")
+            Text("• 支持多SIM卡选择与双卡交替拨打")
+            
+            Text("\n注意事项：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            Text("• 本软件仅供学习研究使用")
+            Text("• 请勿用于任何非法用途")
+            Text("• 使用者需自行承担法律责任")
+        }
     }
 }
 
@@ -553,7 +713,8 @@ fun StatusCard(status: String, progress: Int, total: Int) {
 @Composable
 fun AudioSelector(
     viewModel: AutoCallViewModel,
-    selectedIndex: Int
+    selectedIndex: Int,
+    onImportAudio: () -> Unit
 ) {
     val allAudios = viewModel.getAllAudios()
 
@@ -562,7 +723,16 @@ fun AudioSelector(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("默认音频选择", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("默认音频选择", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Button(onClick = onImportAudio) {
+                    Text("导入音频")
+                }
+            }
 
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -638,6 +808,109 @@ fun RecordingSwitch(isEnabled: Boolean, onToggle: () -> Unit, currentStatus: Str
 }
 
 @Composable
+fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
+    var showDialog by remember { mutableStateOf(false) }
+    val modeText = when (simCardMode) {
+        0 -> "默认卡"
+        1 -> "SIM卡1"
+        2 -> "SIM卡2"
+        3 -> "双卡交替"
+        else -> "默认卡"
+    }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { showDialog = true },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("SIM卡选择", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "当前模式: $modeText",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    "点击选择拨打方式",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary)
+                )
+            }
+            Icon(
+                Icons.Default.ArrowDropDown,
+                contentDescription = "选择",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("选择SIM卡模式") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        0 to "默认卡 - 使用系统默认SIM卡",
+                        1 to "SIM卡1 - 强制使用卡槽1",
+                        2 to "SIM卡2 - 强制使用卡槽2",
+                        3 to "双卡交替 - 轮流使用两张卡"
+                    ).forEach { (mode, description) ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onModeSelected(mode)
+                                    showDialog = false
+                                },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (simCardMode == mode) 
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else 
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        description.substringBefore(" - "),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        description.substringAfter(" - "),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                if (simCardMode == mode) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "已选择",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+}
+
+@Composable
 fun AudioPlaybackSwitch(isEnabled: Boolean, onToggle: () -> Unit, currentStatus: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -686,15 +959,15 @@ fun ControlButtons(
     onResume: () -> Unit,
     onStop: () -> Unit,
     onImportFile: () -> Unit,
-    onImportAudio: () -> Unit
+    onImportClipboard: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onImportFile, enabled = !isRunning, modifier = Modifier.weight(1f)) {
                 Text("导入电话")
             }
-            Button(onClick = onImportAudio, enabled = !isRunning, modifier = Modifier.weight(1f)) {
-                Text("导入音频")
+            Button(onClick = onImportClipboard, enabled = !isRunning, modifier = Modifier.weight(1f)) {
+                Text("导入剪贴板")
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

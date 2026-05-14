@@ -77,12 +77,54 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _isPaused = MutableStateFlow(false) // 是否处于暂停状态
     val isPaused: StateFlow<Boolean> = _isPaused
 
+    // SIM卡相关状态
+    private val _simCardMode = MutableStateFlow(0) // 0: 默认卡, 1: SIM1, 2: SIM2, 3: 双卡交替
+    val simCardMode: StateFlow<Int> = _simCardMode
+
+    private val _currentSimCard = MutableStateFlow(0) // 当前使用的SIM卡 (0或1)
+    val currentSimCard: StateFlow<Int> = _currentSimCard
+
     private val prefs by lazy {
         getApplication<Application>().getSharedPreferences("app_data", Context.MODE_PRIVATE)
     }
 
     init {
         loadData()
+    }
+
+    fun toggleSimCardMode() {
+        // 循环切换：0(默认) -> 1(SIM1) -> 2(SIM2) -> 3(双卡交替) -> 0(默认)
+        _simCardMode.value = (_simCardMode.value + 1) % 4
+        _currentSimCard.value = 0 // 重置当前卡
+        when (_simCardMode.value) {
+            0 -> _currentStatus.value = "已设置为默认SIM卡"
+            1 -> _currentStatus.value = "已设置为使用SIM卡1"
+            2 -> _currentStatus.value = "已设置为使用SIM卡2"
+            3 -> _currentStatus.value = "已设置为双卡交替拨打"
+        }
+    }
+
+    fun setSimCardMode(mode: Int) {
+        if (mode in 0..3) {
+            _simCardMode.value = mode
+            _currentSimCard.value = 0
+            when (mode) {
+                0 -> _currentStatus.value = "已设置为默认SIM卡"
+                1 -> _currentStatus.value = "已设置为使用SIM卡1"
+                2 -> _currentStatus.value = "已设置为使用SIM卡2"
+                3 -> _currentStatus.value = "已设置为双卡交替拨打"
+            }
+        }
+    }
+
+    fun getSimCardModeText(): String {
+        return when (_simCardMode.value) {
+            0 -> "默认卡"
+            1 -> "SIM卡1"
+            2 -> "SIM卡2"
+            3 -> "双卡交替"
+            else -> "默认卡"
+        }
     }
 
     fun toggleRecording() {
@@ -465,8 +507,13 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private fun extractPhoneNumber(value: String?): String? {
         if (value.isNullOrEmpty()) return null
         
+        // 第零步：预处理 - 去除序号前缀（如 "1."、"2)"、"3、" 等）
+        var processed = value.trim()
+        // 匹配常见的序号格式：数字+标点符号开头
+        processed = processed.replace(Regex("^\\d+[.、,)）\\s]+"), "")
+        
         // 第一步：基础清理 - 去除所有非数字和+号字符
-        var cleaned = value.replace(Regex("[^0-9+]"), "")
+        var cleaned = processed.replace(Regex("[^0-9+]"), "")
         
         // 第二步：处理国家代码
         // 去除+86或86前缀（中国大陆）
@@ -499,7 +546,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             // 尝试从原始字符串中提取可能的号码片段
             else -> {
                 // 如果清理后不符合标准格式，尝试从原始文本中提取数字序列
-                val numberSequences = value.split(Regex("[^0-9]+"))
+                val numberSequences = processed.split(Regex("[^0-9]+"))
                     .filter { it.isNotEmpty() }
                     .map { it.trim() }
                 
@@ -649,7 +696,19 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             for ((index, entry) in list.withIndex()) {
                 if (index < startIndex) continue // 跳过已经拨打过的
                 
-                if (!_isRunning.value || _isPaused.value) break
+                // 检查是否被停止或暂停
+                if (!_isRunning.value) break
+                if (_isPaused.value) {
+                    // 暂停状态下，保持_isRunning为true，等待恢复
+                    _currentStatus.value = "已暂停（当前位置: ${index + 1}/${list.size}）"
+                    // 等待直到不再暂停或被停止
+                    while (_isPaused.value && _isRunning.value) {
+                        delay(500)
+                    }
+                    // 如果被停止则退出
+                    if (!_isRunning.value) break
+                }
+                
                 _currentIndex.value = index
                 _progress.value = index + 1
                 _currentStatus.value = "正在拨打 ${index + 1}/${list.size}: ${entry.contactName.ifEmpty { entry.phoneNumber }}"
@@ -659,7 +718,18 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     .format(java.util.Date(startTime))
 
                 val audioPath = entry.audioFilePath ?: getCurrentAudioFile(getApplication())
-                val callSuccess = makeCall(context, entry.phoneNumber)
+                
+                // 根据SIM卡模式选择拨打方式
+                val callSuccess = when (_simCardMode.value) {
+                    3 -> {
+                        // 双卡交替模式
+                        _currentSimCard.value = if (_currentSimCard.value == 0) 1 else 0
+                        makeCallWithSimCard(context, entry.phoneNumber, _currentSimCard.value)
+                    }
+                    1 -> makeCallWithSimCard(context, entry.phoneNumber, 0) // SIM1
+                    2 -> makeCallWithSimCard(context, entry.phoneNumber, 1) // SIM2
+                    else -> makeCall(context, entry.phoneNumber) // 默认卡
+                }
 
                 _currentStatus.value = "等待接通..."
                 val connected = waitForCallConnect()
@@ -718,12 +788,15 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 delay(3000)
             }
 
-            callStateListener?.close()
-            callStateListener = null
-            _callRecords.value = records
-            generateStatistics(records)
-            _currentStatus.value = "全部拨打完成"
-            _isRunning.value = false
+            // 只有在真正完成或停止时才清理状态
+            if (!_isPaused.value) {
+                callStateListener?.close()
+                callStateListener = null
+                _callRecords.value = records
+                generateStatistics(records)
+                _currentStatus.value = "全部拨打完成"
+                _isRunning.value = false
+            }
         }
     }
 
@@ -828,6 +901,30 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            _currentStatus.value = "拨打失败: ${e.message}"
+            false
+        }
+    }
+
+    @SuppressLint("UseKtx")
+    private fun makeCallWithSimCard(context: Context, phoneNumber: String, simSlot: Int): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_CALL).apply {
+                data = Uri.parse("tel:$phoneNumber")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                // 尝试指定SIM卡槽（需要Android 5.1+）
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
+                    putExtra("com.android.phone.force.slot", true)
+                    putExtra("Cdma_Supp", true)
+                    // 不同的设备可能有不同的extra key
+                    putExtra("slot", simSlot)
+                    putExtra("simSlot", simSlot)
+                }
+            }
+            context.startActivity(intent)
+            _currentStatus.value = "使用${if (simSlot == 0) "SIM卡1" else "SIM卡2"}拨打"
             true
         } catch (e: Exception) {
             _currentStatus.value = "拨打失败: ${e.message}"
