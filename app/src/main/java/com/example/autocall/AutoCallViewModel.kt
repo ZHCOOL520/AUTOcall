@@ -71,6 +71,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _sortByCallCount = MutableStateFlow(1) // 0: 不排序, 1: 从小到大, 2: 从大到小
     val sortByCallCount: StateFlow<Int> = _sortByCallCount
 
+    private val _currentIndex = MutableStateFlow(0) // 当前拨打的索引位置
+    val currentIndex: StateFlow<Int> = _currentIndex
+
+    private val _isPaused = MutableStateFlow(false) // 是否处于暂停状态
+    val isPaused: StateFlow<Boolean> = _isPaused
+
     private val prefs by lazy {
         getApplication<Application>().getSharedPreferences("app_data", Context.MODE_PRIVATE)
     }
@@ -618,9 +624,14 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     // ---------- 核心拨打流程 ----------
     fun startAutoCall(context: Context) {
-        if (_isRunning.value) return
+        startAutoCallFromIndex(context, 0)
+    }
+
+    private fun startAutoCallFromIndex(context: Context, startIndex: Int) {
+        if (_isRunning.value && !_isPaused.value) return
         viewModelScope.launch(Dispatchers.Main) {
             _isRunning.value = true
+            _isPaused.value = false
             val list = _phoneList.value
             if (list.isEmpty()) {
                 _currentStatus.value = "电话列表为空"
@@ -633,10 +644,13 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             callStateListener = CallStateListener(getApplication()).also { it.register() }
 
             val records = mutableListOf<CallRecord>()
-            _currentStatus.value = "开始自动拨打，共 ${list.size} 个电话"
+            _currentStatus.value = "开始自动拨打，共 ${list.size} 个电话，从第 ${startIndex + 1} 个开始"
 
             for ((index, entry) in list.withIndex()) {
-                if (!_isRunning.value) break
+                if (index < startIndex) continue // 跳过已经拨打过的
+                
+                if (!_isRunning.value || _isPaused.value) break
+                _currentIndex.value = index
                 _progress.value = index + 1
                 _currentStatus.value = "正在拨打 ${index + 1}/${list.size}: ${entry.contactName.ifEmpty { entry.phoneNumber }}"
 
@@ -779,9 +793,31 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     fun stopAutoCall() {
         _isRunning.value = false
+        _isPaused.value = false
         audioInjector?.stop()
         audioRecorder?.release()
         _currentStatus.value = "已停止"
+    }
+
+    fun pauseAutoCall() {
+        if (_isRunning.value && !_isPaused.value) {
+            _isPaused.value = true
+            _currentStatus.value = "已暂停（当前位置: ${_currentIndex.value + 1}/${_phoneList.value.size}）"
+        }
+    }
+
+    fun resumeAutoCall(context: Context) {
+        if (_isRunning.value && _isPaused.value) {
+            _isPaused.value = false
+            _currentStatus.value = "继续拨打..."
+            // 从下一个位置继续拨打（当前索引已经处理完成）
+            val nextIndex = if (_currentIndex.value + 1 < _phoneList.value.size) {
+                _currentIndex.value + 1
+            } else {
+                _currentIndex.value
+            }
+            startAutoCallFromIndex(context, nextIndex)
+        }
     }
 
     @SuppressLint("UseKtx")

@@ -204,6 +204,8 @@ fun MainScreen(
     val isAudioPlaybackEnabled by viewModel.isAudioPlaybackEnabled.collectAsState()
     val sortByBalance by viewModel.sortByBalance.collectAsState()
     val sortByCallCount by viewModel.sortByCallCount.collectAsState()
+    val currentIndex by viewModel.currentIndex.collectAsState()
+    val isPaused by viewModel.isPaused.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
 
@@ -264,7 +266,10 @@ fun MainScreen(
 
                 ControlButtons(
                     isRunning = isRunning,
+                    isPaused = isPaused,
                     onStart = { viewModel.startAutoCall(context) },
+                    onPause = { viewModel.pauseAutoCall() },
+                    onResume = { viewModel.resumeAutoCall(context) },
                     onStop = { viewModel.stopAutoCall() },
                     onImportFile = onImportFile,
                     onImportAudio = onImportAudio
@@ -675,7 +680,10 @@ fun ExportButton(onExport: () -> Unit) {
 @Composable
 fun ControlButtons(
     isRunning: Boolean,
+    isPaused: Boolean,
     onStart: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
     onStop: () -> Unit,
     onImportFile: () -> Unit,
     onImportAudio: () -> Unit
@@ -692,6 +700,25 @@ fun ControlButtons(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onStart, enabled = !isRunning, modifier = Modifier.weight(1f)) {
                 Text("开始拨打")
+            }
+            if (isRunning && !isPaused) {
+                Button(
+                    onClick = onPause, 
+                    enabled = isRunning, 
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Text("暂停")
+                }
+            } else if (isRunning && isPaused) {
+                Button(
+                    onClick = onResume, 
+                    enabled = isRunning, 
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("继续")
+                }
             }
             Button(
                 onClick = onStop, enabled = isRunning, modifier = Modifier.weight(1f),
