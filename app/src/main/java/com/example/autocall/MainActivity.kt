@@ -1,4 +1,5 @@
 package com.example.autocall
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ClipboardManager
@@ -15,16 +16,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -36,36 +28,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -85,8 +49,15 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
+
+// 常量定义
+private const val GITHUB_RELEASES_URL = "https://github.com/ZHCOOL520/AUTOcall/releases"
+private const val GITHUB_API_URL = "https://api.github.com/repos/ZHCOOL520/AUTOcall/releases/latest"
+private const val PREFS_NAME = "app_prefs"
+private const val DISCLAIMER_KEY = "disclaimer_accepted"
+private const val UPDATE_CHECK_PREFS = "update_check"
+private const val LAST_CHECK_TIME_KEY = "last_check_time"
 
 class MainActivity : ComponentActivity() {
 
@@ -94,6 +65,10 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
+    ) { }
+
+    private val installApkLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
     ) { }
 
     private val openDocumentLauncher = registerForActivityResult(
@@ -260,10 +235,24 @@ fun MainScreen(
     val isPaused by viewModel.isPaused.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<Triple<String, String, String>?>(null) }
 
     LaunchedEffect(Unit) {
         val audioDir = File(context.getExternalFilesDir(null), "audio")
         viewModel.setAudioDirectory(context, audioDir.absolutePath)
+        
+        // 自动检查更新
+        if (viewModel.autoCheckUpdateEnabled.value) {
+            checkUpdateIfNeeded(
+                context = context,
+                viewModel = viewModel,
+                onNewVersionFound = { version, content, url ->
+                    showUpdateDialog = true
+                    updateInfo = Triple(version, content, url)
+                }
+            )
+        }
     }
 
     Scaffold(
@@ -427,41 +416,128 @@ fun MainScreen(
     }
 
     if (showAboutDialog) {
+        AboutSoftwareDialog(
+            onDismiss = { showAboutDialog = false },
+            context = context
+        )
+    }
+    
+    // 更新对话框
+    if (showUpdateDialog && updateInfo != null) {
+        var isDownloading by remember { mutableStateOf(false) }
+        var downloadProgress by remember { mutableStateOf(0f) }
+        val snackbarHostState = remember { SnackbarHostState() }
+        
         AlertDialog(
-            onDismissRequest = { showAboutDialog = false },
-            title = { Text("关于软件") },
+            onDismissRequest = { if (!isDownloading) showUpdateDialog = false },
+            title = { Text("发现新版本") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("自动电话拨打系统", fontWeight = FontWeight.Bold)
-                    Text("版本: 3.1.1")
-                    Text("开发者: ZHCOOL520")
+                    Text("最新版本: ${updateInfo!!.first}", fontWeight = FontWeight.Bold)
+                    Text("\n更新内容:", fontWeight = FontWeight.Bold)
+                    Text(updateInfo!!.second)
                     
-                    Text("\n相关链接：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-                    Text(
-                        text = "• GitHub: https://github.com/ZHCOOL520/AUTOcall",
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ZHCOOL520/AUTOcall"))
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
+                    if (isDownloading) {
+                        Column(modifier = Modifier.padding(top = 8.dp)) {
+                            LinearProgressIndicator(
+                                progress = { downloadProgress },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                "下载中... ${(downloadProgress * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
-                    )
-                    Text(
-                        text = "• Bilibili: https://space.bilibili.com/1414910921",
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://space.bilibili.com/1414910921?spm_id_from=333.1007.0.0"))
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                        }
-                    )
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = { showAboutDialog = false }) { Text("确定") }
+                Button(
+                    onClick = {
+                        isDownloading = true
+                        downloadAndInstallApk(
+                            context = context,
+                            apkUrl = updateInfo!!.third,
+                            snackbarHostState = snackbarHostState,
+                            onProgress = { progress ->
+                                downloadProgress = progress
+                            },
+                            onComplete = {
+                                isDownloading = false
+                                showUpdateDialog = false
+                            },
+                            onError = {
+                                isDownloading = false
+                            }
+                        )
+                    },
+                    enabled = !isDownloading
+                ) {
+                    if (isDownloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.padding(end = 8.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    Text(if (isDownloading) "下载中" else "后台下载安装")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo!!.third))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        showUpdateDialog = false 
+                    },
+                    enabled = !isDownloading
+                ) {
+                    Text("浏览器下载")
+                }
             }
         )
     }
+}
+
+@Composable
+fun AboutSoftwareDialog(
+    onDismiss: () -> Unit,
+    context: Context
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("关于软件") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("自动电话拨打系统", fontWeight = FontWeight.Bold)
+                Text("开发者: ZHCOOL520")
+                
+                Text("\n相关链接：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                Text(
+                    text = "• GitHub: https://github.com/ZHCOOL520/AUTOcall",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ZHCOOL520/AUTOcall"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    }
+                )
+                Text(
+                    text = "• Bilibili: https://space.bilibili.com/1414910921",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://space.bilibili.com/1414910921?spm_id_from=333.1007.0.0"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) { Text("确定") }
+        }
+    )
 }
 
 @SuppressLint("UseKtx")
@@ -484,6 +560,8 @@ fun SettingsScreen(
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var updateInfo by remember { mutableStateOf<Triple<String, String, String>?>(null) } // (version, content, url)
+    var showFeatureIntro by remember { mutableStateOf(false) }
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
 
     // 启动时检查更新
     LaunchedEffect(Unit) {
@@ -661,10 +739,7 @@ fun SettingsScreen(
                     ) {
                         Column {
                             Text("版本信息", fontWeight = FontWeight.Bold)
-                            Text(
-                                "当前版本: ${getAppVersion(context)}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Text("当前版本: ${getAppVersion(context)}", style = MaterialTheme.typography.bodySmall)
                         }
                         Button(
                             onClick = {
@@ -740,49 +815,276 @@ fun SettingsScreen(
                 }
             }
 
+            // 网络提示
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🌐 网络说明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    Text(
+                        "由于国内网络原因，GitHub可能无法直接访问。\n" +
+                        "如果自动更新失败，请使用网络代理工具（魔法）后再试。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_RELEASES_URL))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("前往下载页面")
+                    }
+                }
+            }
+
             // 功能说明
-            Text("功能说明：", fontWeight = FontWeight.Bold)
-            Text("• 支持Excel/CSV文件导入联系人")
-            Text("• 自动拨打电话并播放语音")
-            Text("• 支持通话录音")
-            Text("• 导出通话记录统计")
-            Text("• 支持剪贴板导入电话号码")
-            Text("• 支持多SIM卡选择与双卡交替拨打")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("📖 功能介绍", fontWeight = FontWeight.Bold)
+                    Text("• 支持Excel/CSV文件导入联系人", style = MaterialTheme.typography.bodySmall)
+                    Text("• 自动拨打电话并播放语音", style = MaterialTheme.typography.bodySmall)
+                    Text("• 支持通话录音（需ROOT）", style = MaterialTheme.typography.bodySmall)
+                    Text("• 导出通话记录统计", style = MaterialTheme.typography.bodySmall)
+                    Text("• 支持剪贴板导入电话号码", style = MaterialTheme.typography.bodySmall)
+                    Text("• 支持多SIM卡选择与双卡交替拨打", style = MaterialTheme.typography.bodySmall)
+                    Text("• 自动检查更新与后台下载安装", style = MaterialTheme.typography.bodySmall)
+                    
+                    Button(
+                        onClick = { showFeatureIntro = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("查看完整功能介绍")
+                    }
+                }
+            }
             
-            Text("\n注意事项：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-            Text("• 本软件仅供学习研究使用")
-            Text("• 请勿用于任何非法用途")
-            Text("• 使用者需自行承担法律责任")
+            // 隐私政策与免责声明
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("⚠️ 隐私政策与免责声明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    Text("• 本软件仅供学习研究使用", style = MaterialTheme.typography.bodySmall)
+                    Text("• 严禁用于任何非法用途", style = MaterialTheme.typography.bodySmall)
+                    Text("• 使用者需自行承担法律责任", style = MaterialTheme.typography.bodySmall)
+                    
+                    Button(
+                        onClick = { showPrivacyPolicy = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("查看完整协议")
+                    }
+                }
+            }
         }
     }
 
     // 更新对话框
     if (showUpdateDialog && updateInfo != null) {
+        var isDownloading by remember { mutableStateOf(false) }
+        var downloadProgress by remember { mutableStateOf(0f) }
+        
         AlertDialog(
-            onDismissRequest = { showUpdateDialog = false },
+            onDismissRequest = { if (!isDownloading) showUpdateDialog = false },
             title = { Text("发现新版本") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("最新版本: ${updateInfo!!.first}", fontWeight = FontWeight.Bold)
                     Text("\n更新内容:", fontWeight = FontWeight.Bold)
                     Text(updateInfo!!.second)
+                    
+                    if (isDownloading) {
+                        Column(modifier = Modifier.padding(top = 8.dp)) {
+                            LinearProgressIndicator(
+                                progress = { downloadProgress },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                "下载中... ${(downloadProgress * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo!!.third))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                    showUpdateDialog = false
-                }) {
-                    Text("前往下载")
+                Button(
+                    onClick = {
+                        isDownloading = true
+                        downloadAndInstallApk(
+                            context = context,
+                            apkUrl = updateInfo!!.third,
+                            snackbarHostState = snackbarHostState,
+                            onProgress = { progress ->
+                                downloadProgress = progress
+                            },
+                            onComplete = {
+                                isDownloading = false
+                                showUpdateDialog = false
+                            },
+                            onError = {
+                                isDownloading = false
+                            }
+                        )
+                    },
+                    enabled = !isDownloading
+                ) {
+                    if (isDownloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.padding(end = 8.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    Text(if (isDownloading) "下载中" else "后台下载安装")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showUpdateDialog = false }) {
-                    Text("稍后再说")
+                TextButton(
+                    onClick = { 
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo!!.third))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        showUpdateDialog = false 
+                    },
+                    enabled = !isDownloading
+                ) {
+                    Text("浏览器下载")
                 }
             }
+        )
+    }
+    
+    // 功能介绍对话框
+    if (showFeatureIntro) {
+        AlertDialog(
+            onDismissRequest = { showFeatureIntro = false },
+            title = { Text("📖 功能介绍") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("📞 自动拨打", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text("• 支持从Excel/CSV文件批量导入联系人", style = MaterialTheme.typography.bodySmall)
+                            Text("• 自动识别户号和余额信息", style = MaterialTheme.typography.bodySmall)
+                            Text("• 按顺序自动拨打电话", style = MaterialTheme.typography.bodySmall)
+                            Text("• 支持暂停、继续和停止操作", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("🔊 音频播放", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text("• 通话时自动播放预设语音文件", style = MaterialTheme.typography.bodySmall)
+                            Text("• 支持自定义导入音频文件", style = MaterialTheme.typography.bodySmall)
+                            Text("• 可选择不同场景的语音（余额不足、停电等）", style = MaterialTheme.typography.bodySmall)
+                            Text("• 注意：非ROOT设备可能无法让对方听到", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("🎙️ 通话录音", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text("• 自动录制通话内容", style = MaterialTheme.typography.bodySmall)
+                            Text("• 保存到本地存储", style = MaterialTheme.typography.bodySmall)
+                            Text("• 注意：需要ROOT权限才能正常工作", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("💳 SIM卡管理", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text("• 支持选择SIM卡1或SIM卡2拨打", style = MaterialTheme.typography.bodySmall)
+                            Text("• 双卡交替模式，轮流使用两张卡", style = MaterialTheme.typography.bodySmall)
+                            Text("• 智能识别可用SIM卡", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("📊 数据统计", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text("• 实时统计拨打次数和成功率", style = MaterialTheme.typography.bodySmall)
+                            Text("• 支持按拨打次数排序", style = MaterialTheme.typography.bodySmall)
+                            Text("• 支持按余额排序", style = MaterialTheme.typography.bodySmall)
+                            Text("• 导出CSV格式的通话记录", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("🔄 自动更新", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text("• 启动时自动检查最新版本", style = MaterialTheme.typography.bodySmall)
+                            Text("• 后台下载APK文件", style = MaterialTheme.typography.bodySmall)
+                            Text("• 显示下载进度", style = MaterialTheme.typography.bodySmall)
+                            Text("• 下载完成后自动触发安装", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showFeatureIntro = false }) {
+                    Text("关闭")
+                }
+            }
+        )
+    }
+    
+    // 隐私政策对话框
+    if (showPrivacyPolicy) {
+        DisclaimerDialog(
+            onAccept = { showPrivacyPolicy = false },
+            onDecline = { showPrivacyPolicy = false }
         )
     }
 }
@@ -796,7 +1098,7 @@ fun DisclaimerDialog(
         onDismissRequest = { },
         title = { 
             Text(
-                "⚠️ 重要声明与权限说明",
+                "⚠️ 用户协议与隐私政策",
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.error
             ) 
@@ -814,15 +1116,15 @@ fun DisclaimerDialog(
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("🔒 安全声明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                        Text("• 本软件仅供学习研究使用", style = MaterialTheme.typography.bodySmall)
-                        Text("• 请勿用于任何非法用途", style = MaterialTheme.typography.bodySmall)
-                        Text("• 使用者需自行承担法律责任", style = MaterialTheme.typography.bodySmall)
-                        Text("• 开发者不对使用后果负责", style = MaterialTheme.typography.bodySmall)
+                        Text("🔒 重要声明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text("• 本软件仅供学习研究使用，严禁用于任何非法用途", style = MaterialTheme.typography.bodySmall)
+                        Text("• 使用者需自行承担全部法律责任", style = MaterialTheme.typography.bodySmall)
+                        Text("• 开发者不对任何使用后果负责", style = MaterialTheme.typography.bodySmall)
+                        Text("• 请勿骚扰他人或进行恶意拨打", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
-                // 核心限制提示
+                // 核心功能限制提示
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -830,17 +1132,17 @@ fun DisclaimerDialog(
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("❗ 核心功能限制", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                        Text("❗ 功能限制说明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                         Text(
-                            "⚠️ 由于您的手机未ROOT，以下核心功能将无法使用：",
+                            "⚠️ 由于Android系统安全限制，以下功能可能受限：",
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text("• 通话录音功能可能无法正常工作", style = MaterialTheme.typography.bodySmall)
-                        Text("• 音频注入（让对方听到语音）可能失败", style = MaterialTheme.typography.bodySmall)
-                        Text("• 部分Android系统会阻止应用访问通话音频通道", style = MaterialTheme.typography.bodySmall)
-                        Text("\n💡 建议：如需完整功能，请使用已ROOT的设备", style = MaterialTheme.typography.bodySmall)
+                        Text("• 通话录音功能在非ROOT设备上可能无法正常工作", style = MaterialTheme.typography.bodySmall)
+                        Text("• 音频注入（让对方听到语音）可能被系统阻止", style = MaterialTheme.typography.bodySmall)
+                        Text("• 部分Android版本会严格限制应用访问通话音频通道", style = MaterialTheme.typography.bodySmall)
+                        Text("\n💡 建议：如需完整功能，请使用已ROOT的设备或特定品牌手机", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
@@ -852,18 +1154,37 @@ fun DisclaimerDialog(
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("📋 所需权限说明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("• CALL_PHONE：拨打电话功能", style = MaterialTheme.typography.bodySmall)
-                        Text("• READ_PHONE_STATE：监听通话状态", style = MaterialTheme.typography.bodySmall)
-                        Text("• RECORD_AUDIO：通话录音功能", style = MaterialTheme.typography.bodySmall)
-                        Text("• READ_MEDIA_AUDIO：读取音频文件", style = MaterialTheme.typography.bodySmall)
+                        Text("📋 权限使用说明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("• CALL_PHONE：用于自动拨打电话功能", style = MaterialTheme.typography.bodySmall)
+                        Text("• READ_PHONE_STATE：用于监听通话状态和SIM卡信息", style = MaterialTheme.typography.bodySmall)
+                        Text("• RECORD_AUDIO：用于通话录音功能（可选）", style = MaterialTheme.typography.bodySmall)
+                        Text("• READ_MEDIA_AUDIO：用于读取和播放音频文件", style = MaterialTheme.typography.bodySmall)
+                        Text("• INTERNET：用于检查软件更新", style = MaterialTheme.typography.bodySmall)
+                        Text("• REQUEST_INSTALL_PACKAGES：用于安装更新的APK文件", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                // 隐私政策
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("🔐 隐私保护", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        Text("• 本软件不会收集、上传或分享任何个人信息", style = MaterialTheme.typography.bodySmall)
+                        Text("• 所有数据仅存储在本地设备中", style = MaterialTheme.typography.bodySmall)
+                        Text("• 联系人信息、通话记录等数据完全由用户控制", style = MaterialTheme.typography.bodySmall)
+                        Text("• 软件不包含任何广告或追踪代码", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
                 Text(
-                    "点击「我同意」表示您已阅读并理解以上内容",
+                    "点击「我同意」表示您已阅读并完全理解以上内容，同意使用本软件",
                     style = MaterialTheme.typography.bodySmall,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    fontWeight = FontWeight.Bold
                 )
             }
         },
@@ -1268,8 +1589,8 @@ fun checkUpdateIfNeeded(
     onNewVersionFound: (version: String, content: String, url: String) -> Unit
 ) {
     GlobalScope.launch(Dispatchers.Main) {
-        val prefs = context.getSharedPreferences("update_check", Context.MODE_PRIVATE)
-        val lastCheckTime = prefs.getLong("last_check_time", 0)
+        val prefs = context.getSharedPreferences(UPDATE_CHECK_PREFS, Context.MODE_PRIVATE)
+        val lastCheckTime = prefs.getLong(LAST_CHECK_TIME_KEY, 0)
         val currentTime = System.currentTimeMillis()
         
         // 根据设置的频率计算需要间隔的时间
@@ -1286,7 +1607,7 @@ fun checkUpdateIfNeeded(
                 withContext(Dispatchers.IO) {
                     val client = OkHttpClient()
                     val request = Request.Builder()
-                        .url("https://api.github.com/repos/ZHCOOL520/AUTOcall/releases/latest")
+                        .url(GITHUB_API_URL)
                         .header("Accept", "application/vnd.github.v3+json")
                         .build()
                     
@@ -1302,19 +1623,118 @@ fun checkUpdateIfNeeded(
                         val content = json.optString("body", "暂无更新说明")
                         val htmlUrl = json.getString("html_url")
                         
+                        // 获取APK下载链接
+                        val assets = json.getJSONArray("assets")
+                        var apkUrl = ""
+                        for (i in 0 until assets.length()) {
+                            val asset = assets.getJSONObject(i)
+                            if (asset.getString("name").endsWith(".apk")) {
+                                apkUrl = asset.getString("browser_download_url")
+                                break
+                            }
+                        }
+                        
                         withContext(Dispatchers.Main) {
                             val currentVersion = getAppVersion(context)
                             val compareResult = compareVersions(currentVersion, version)
                             if (compareResult == 1) {
-                                onNewVersionFound(version, content, htmlUrl)
+                                onNewVersionFound(version, content, apkUrl.ifEmpty { htmlUrl })
                             }
                             // 更新最后检查时间
-                            prefs.edit().putLong("last_check_time", currentTime).apply()
+                            prefs.edit().putLong(LAST_CHECK_TIME_KEY, currentTime).apply()
                         }
                     }
                 }
             } catch (e: Exception) {
                 Log.e("UpdateCheck", "自动检查更新失败: ${e.message}")
+            }
+        }
+    }
+}
+
+// 下载并安装APK
+fun downloadAndInstallApk(
+    context: Context,
+    apkUrl: String,
+    snackbarHostState: androidx.compose.material3.SnackbarHostState,
+    onProgress: (Float) -> Unit = {},
+    onComplete: () -> Unit = {},
+    onError: () -> Unit = {}
+) {
+    GlobalScope.launch(Dispatchers.Main) {
+        try {
+            withContext(Dispatchers.IO) {
+                val client = OkHttpClient()
+                val request = Request.Builder().url(apkUrl).build()
+                val response = client.newCall(request).execute()
+                
+                if (!response.isSuccessful) {
+                    throw Exception("下载失败: HTTP ${response.code}")
+                }
+                
+                val body = response.body ?: throw Exception("响应体为空")
+                val contentLength = body.contentLength()
+                val inputStream = body.byteStream()
+                
+                // 保存到缓存目录
+                val apkFile = File(context.cacheDir, "update.apk")
+                apkFile.outputStream().use { output ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    var totalBytesRead = 0L
+                    
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+                        
+                        // 更新进度
+                        if (contentLength > 0) {
+                            val progress = totalBytesRead.toFloat() / contentLength.toFloat()
+                            withContext(Dispatchers.Main) {
+                                onProgress(progress)
+                            }
+                        }
+                    }
+                }
+                
+                withContext(Dispatchers.Main) {
+                    // 触发安装
+                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        apkFile
+                    )
+                    
+                    val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                        data = uri
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                        putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                    }
+                    
+                    try {
+                        context.startActivity(intent)
+                        onComplete()
+                    } catch (e: Exception) {
+                        // 如果INSTALL_PACKAGE失败，尝试ACTION_VIEW
+                        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(viewIntent)
+                        onComplete()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                snackbarHostState.showSnackbar(
+                    "下载失败: ${e.message}",
+                    duration = SnackbarDuration.Long
+                )
+                onError()
             }
         }
     }
