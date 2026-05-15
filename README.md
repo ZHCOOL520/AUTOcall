@@ -1,6 +1,6 @@
 # 自动电话拨打系统 (AUTOcall)
 
-![Version](https://img.shields.io/badge/version-3.1.1-blue)
+![Version](https://img.shields.io/badge/version-3.1.2-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
 
@@ -94,6 +94,11 @@
 ---
 
 ## 🔄 更新日志
+
+### v3.1.2 (2026-05-15)
+- 🐛 **SIM卡选择修复**：修复SIM卡选择对话框弹出问题，使用SubscriptionManager API
+- 🔧 **权限优化**：添加READ_PHONE_STATE权限检查，提升稳定性
+- 🐛 **问题修复**：解决交替模式和指定SIM卡拨打时卡住的问题
 
 ### v3.1.1 (2026-05-15)
 - 🐛 **版本比较修复**：修复版本号比较逻辑，使用语义化版本比较

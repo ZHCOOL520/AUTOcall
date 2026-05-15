@@ -948,13 +948,42 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             val intent = Intent(Intent.ACTION_CALL).apply {
                 data = Uri.parse("tel:$phoneNumber")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                // 尝试指定SIM卡槽（需要Android 5.1+）
+                // 使用Android标准API指定SIM卡槽
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
-                    putExtra("com.android.phone.force.slot", true)
-                    putExtra("Cdma_Supp", true)
-                    // 不同的设备可能有不同的extra key
-                    putExtra("slot", simSlot)
-                    putExtra("simSlot", simSlot)
+                    // 主要方式：使用SubscriptionManager获取正确的slotId
+                    try {
+                        val subscriptionManager = context.getSystemService(android.telephony.SubscriptionManager::class.java)
+                        if (subscriptionManager != null) {
+                            // 检查权限
+                            if (context.checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                val activeSubscriptions = subscriptionManager.activeSubscriptionInfoList
+                                if (activeSubscriptions != null && activeSubscriptions.isNotEmpty()) {
+                                    // simSlot是0或1，对应列表索引
+                                    val index = if (simSlot < activeSubscriptions.size) simSlot else 0
+                                    val subscriptionInfo = activeSubscriptions[index]
+                                    // 使用subscriptionId而不是slotId
+                                    putExtra("android.telephony.extra.SUBSCRIPTION_INDEX", subscriptionInfo.subscriptionId)
+                                    putExtra("subscription", subscriptionInfo.subscriptionId)
+                                }
+                            } else {
+                                Log.w(tag, "缺少READ_PHONE_STATE权限，使用默认拨号")
+                            }
+                        }
+                    } catch (e: SecurityException) {
+                        Log.e(tag, "权限不足: ${e.message}")
+                        // 降级方案：使用旧的extra参数
+                        putExtra("com.android.phone.force.slot", true)
+                        putExtra("Cdma_Supp", true)
+                        putExtra("slot", simSlot)
+                        putExtra("simSlot", simSlot)
+                    } catch (e: Exception) {
+                        Log.e(tag, "获取SubscriptionInfo失败: ${e.message}")
+                        // 降级方案：使用旧的extra参数
+                        putExtra("com.android.phone.force.slot", true)
+                        putExtra("Cdma_Supp", true)
+                        putExtra("slot", simSlot)
+                        putExtra("simSlot", simSlot)
+                    }
                 }
             }
             context.startActivity(intent)
