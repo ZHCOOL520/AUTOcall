@@ -1,6 +1,6 @@
 # 自动电话拨打系统 (AUTOcall)
 
-![Version](https://img.shields.io/badge/version-3.0.0-blue)
+![Version](https://img.shields.io/badge/version-3.1.1-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
 
@@ -94,6 +94,11 @@
 ---
 
 ## 🔄 更新日志
+
+### v3.1.1 (2026-05-15)
+- 🐛 **版本比较修复**：修复版本号比较逻辑，使用语义化版本比较
+- 🔧 **代码优化**：改进自动检查更新和手动检查更新的版本判断
+- 🐛 **问题修复**：修复版本显示不一致问题
 
 ### v3.0.0 (2026-05-15)
 - ✨ **UI 重构**：设置改为独立页面，导航更清晰

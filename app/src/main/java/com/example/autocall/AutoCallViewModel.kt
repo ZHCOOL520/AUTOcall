@@ -84,12 +84,20 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _currentSimCard = MutableStateFlow(0) // 当前使用的SIM卡 (0或1)
     val currentSimCard: StateFlow<Int> = _currentSimCard
 
+    // 自动检查更新相关状态
+    private val _autoCheckUpdateEnabled = MutableStateFlow(false)
+    val autoCheckUpdateEnabled: StateFlow<Boolean> = _autoCheckUpdateEnabled
+
+    private val _checkUpdateInterval = MutableStateFlow(2) // 0: 每日, 1: 每周, 2: 每月
+    val checkUpdateInterval: StateFlow<Int> = _checkUpdateInterval
+
     private val prefs by lazy {
         getApplication<Application>().getSharedPreferences("app_data", Context.MODE_PRIVATE)
     }
 
     init {
         loadData()
+        loadUpdateSettings()
     }
 
     fun toggleSimCardMode() {
@@ -114,6 +122,32 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 2 -> _currentStatus.value = "已设置为使用SIM卡2"
                 3 -> _currentStatus.value = "已设置为双卡交替拨打"
             }
+        }
+    }
+
+    fun toggleAutoCheckUpdate() {
+        _autoCheckUpdateEnabled.value = !_autoCheckUpdateEnabled.value
+        saveUpdateSettings()
+    }
+
+    fun setAutoCheckUpdate(enabled: Boolean) {
+        _autoCheckUpdateEnabled.value = enabled
+        saveUpdateSettings()
+    }
+
+    fun setCheckUpdateInterval(interval: Int) {
+        if (interval in 0..2) {
+            _checkUpdateInterval.value = interval
+            saveUpdateSettings()
+        }
+    }
+
+    private fun saveUpdateSettings() {
+        viewModelScope.launch(Dispatchers.IO) {
+            prefs.edit()
+                .putBoolean("auto_check_update", _autoCheckUpdateEnabled.value)
+                .putInt("check_update_interval", _checkUpdateInterval.value)
+                .apply()
         }
     }
 
@@ -1050,6 +1084,21 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 }
             } catch (e: Exception) {
                 Log.e(tag, "加载数据失败: ${e.message}")
+            }
+        }
+    }
+
+    private fun loadUpdateSettings() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val autoCheckEnabled = prefs.getBoolean("auto_check_update", false)
+                val interval = prefs.getInt("check_update_interval", 2) // 默认每月
+                withContext(Dispatchers.Main) {
+                    _autoCheckUpdateEnabled.value = autoCheckEnabled
+                    _checkUpdateInterval.value = interval
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "加载更新设置失败: ${e.message}")
             }
         }
     }

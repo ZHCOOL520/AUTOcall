@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -34,13 +35,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -50,6 +51,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,11 +72,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.autocall.ui.theme.AUTOCallTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -109,7 +119,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun importFromClipboard() {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         if (clipboard.hasPrimaryClip()) {
             val clipData = clipboard.primaryClip
             if (clipData != null && clipData.itemCount > 0) {
@@ -151,7 +161,6 @@ class MainActivity : ComponentActivity() {
                             MainScreen(
                                 viewModel = viewModel,
                                 onImportFile = { openDocumentLauncher.launch("*/*") },
-                                onImportAudio = { importAudioLauncher.launch("audio/*") },
                                 onExport = {
                                     val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                                     exportLauncher.launch("call_records_$ts.csv")
@@ -236,7 +245,6 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     viewModel: AutoCallViewModel,
     onImportFile: () -> Unit,
-    onImportAudio: () -> Unit,
     onExport: () -> Unit,
     onImportClipboard: () -> Unit,
     onNavigateToSettings: () -> Unit
@@ -246,7 +254,6 @@ fun MainScreen(
     val currentStatus by viewModel.currentStatus.collectAsState()
     val isRunning by viewModel.isRunning.collectAsState()
     val progress by viewModel.progress.collectAsState()
-    val selectedAudioIndex by viewModel.selectedAudioIndex.collectAsState()
     val statistics by viewModel.statistics.collectAsState()
     val sortByBalance by viewModel.sortByBalance.collectAsState()
     val sortByCallCount by viewModel.sortByCallCount.collectAsState()
@@ -426,7 +433,7 @@ fun MainScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("自动电话拨打系统", fontWeight = FontWeight.Bold)
-                    Text("版本: 3.0.0")
+                    Text("版本: 3.1.1")
                     Text("开发者: ZHCOOL520")
                     
                     Text("\n相关链接：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
@@ -471,6 +478,22 @@ fun SettingsScreen(
     val isAudioPlaybackEnabled by viewModel.isAudioPlaybackEnabled.collectAsState()
     val selectedAudioIndex by viewModel.selectedAudioIndex.collectAsState()
     val simCardMode by viewModel.simCardMode.collectAsState()
+    val autoCheckUpdateEnabled by viewModel.autoCheckUpdateEnabled.collectAsState()
+    val checkUpdateInterval by viewModel.checkUpdateInterval.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<Triple<String, String, String>?>(null) } // (version, content, url)
+
+    // 启动时检查更新
+    LaunchedEffect(Unit) {
+        if (viewModel.autoCheckUpdateEnabled.value) {
+            checkUpdateIfNeeded(context, viewModel) { version, content, url ->
+                updateInfo = Triple(version, content, url)
+                showUpdateDialog = true
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -486,7 +509,8 @@ fun SettingsScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -573,6 +597,149 @@ fun SettingsScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+            // 自动检查更新设置
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("自动检查更新", fontWeight = FontWeight.Bold)
+                            Text(
+                                if (autoCheckUpdateEnabled) "✅ 开启" else "❌ 关闭",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = autoCheckUpdateEnabled,
+                            onCheckedChange = { viewModel.toggleAutoCheckUpdate() }
+                        )
+                    }
+                    
+                    if (autoCheckUpdateEnabled) {
+                        Text("检查频率:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                0 to "每日",
+                                1 to "每周",
+                                2 to "每月"
+                            ).forEach { (value, label) ->
+                                FilterChip(
+                                    selected = checkUpdateInterval == value,
+                                    onClick = { viewModel.setCheckUpdateInterval(value) },
+                                    label = { Text(label) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 版本信息
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("版本信息", fontWeight = FontWeight.Bold)
+                            Text(
+                                "当前版本: ${getAppVersion(context)}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                GlobalScope.launch(Dispatchers.Main) {
+                                    isCheckingUpdate = true
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            val client = OkHttpClient()
+                                            val request = Request.Builder()
+                                                .url("https://api.github.com/repos/ZHCOOL520/AUTOcall/releases/latest")
+                                                .header("Accept", "application/vnd.github.v3+json")
+                                                .build()
+                                            
+                                            val response = client.newCall(request).execute()
+                                            if (!response.isSuccessful) {
+                                                throw Exception("HTTP ${response.code}")
+                                            }
+                                            
+                                            val responseBody = response.body?.string()
+                                            if (responseBody != null) {
+                                                val json = JSONObject(responseBody)
+                                                val version = json.getString("tag_name")
+                                                val content = json.optString("body", "暂无更新说明")
+                                                val htmlUrl = json.getString("html_url")
+                                                
+                                                withContext(Dispatchers.Main) {
+                                                    isCheckingUpdate = false
+                                                    val currentVersion = getAppVersion(context)
+                                                    val compareResult = compareVersions(currentVersion, version)
+                                                    if (compareResult == 1) {
+                                                        updateInfo = Triple(version, content, htmlUrl)
+                                                        showUpdateDialog = true
+                                                    } else {
+                                                        snackbarHostState.showSnackbar(
+                                                            "已是最新版本",
+                                                            duration = SnackbarDuration.Short
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                withContext(Dispatchers.Main) {
+                                                    isCheckingUpdate = false
+                                                    snackbarHostState.showSnackbar(
+                                                        "检查更新失败: 响应为空",
+                                                        duration = SnackbarDuration.Long
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            isCheckingUpdate = false
+                                            snackbarHostState.showSnackbar(
+                                                "检查更新失败: ${e.message}",
+                                                duration = SnackbarDuration.Long
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !isCheckingUpdate
+                        ) {
+                            if (isCheckingUpdate) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(4.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("检查更新")
+                            }
+                        }
+                    }
+                }
+            }
+
             // 功能说明
             Text("功能说明：", fontWeight = FontWeight.Bold)
             Text("• 支持Excel/CSV文件导入联系人")
@@ -587,6 +754,36 @@ fun SettingsScreen(
             Text("• 请勿用于任何非法用途")
             Text("• 使用者需自行承担法律责任")
         }
+    }
+
+    // 更新对话框
+    if (showUpdateDialog && updateInfo != null) {
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            title = { Text("发现新版本") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("最新版本: ${updateInfo!!.first}", fontWeight = FontWeight.Bold)
+                    Text("\n更新内容:", fontWeight = FontWeight.Bold)
+                    Text(updateInfo!!.second)
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo!!.third))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    showUpdateDialog = false
+                }) {
+                    Text("前往下载")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdateDialog = false }) {
+                    Text("稍后再说")
+                }
+            }
+        )
     }
 }
 
@@ -775,39 +972,6 @@ fun StatisticsCard(statistics: String) {
 }
 
 @Composable
-fun RecordingSwitch(isEnabled: Boolean, onToggle: () -> Unit, currentStatus: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isEnabled) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("通话录音", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(
-                    if (isEnabled) "✅ 开启：通话时自动录音" else "❌ 关闭：不录音",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (currentStatus.contains("录音", ignoreCase = true)) {
-                    Text(
-                        "状态: $currentStatus",
-                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-            Switch(checked = isEnabled, onCheckedChange = { onToggle() })
-        }
-    }
-}
-
-@Composable
 fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
     var showDialog by remember { mutableStateOf(false) }
     val modeText = when (simCardMode) {
@@ -907,39 +1071,6 @@ fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
                 }
             }
         )
-    }
-}
-
-@Composable
-fun AudioPlaybackSwitch(isEnabled: Boolean, onToggle: () -> Unit, currentStatus: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isEnabled) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("音频播放", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(
-                    if (isEnabled) "✅ 开启：通话时自动播放音频" else "❌ 关闭：不播放音频",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (currentStatus.contains("音频播放", ignoreCase = true)) {
-                    Text(
-                        "状态: $currentStatus",
-                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-            Switch(checked = isEnabled, onCheckedChange = { onToggle() })
-        }
     }
 }
 
@@ -1100,3 +1231,92 @@ fun PhoneItem(entry: PhoneEntry, onClick: () -> Unit = {}) {
         }
     }
 }
+
+// 获取应用版本号
+fun getAppVersion(context: Context): String {
+    return try {
+        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        packageInfo.versionName ?: "1.0"
+    } catch (e: Exception) {
+        "1.0"
+    }
+}
+
+// 比较版本号，返回: 1(远程更新), 0(相同), -1(本地更新)
+fun compareVersions(localVersion: String, remoteVersion: String): Int {
+    fun parseVersion(version: String): List<Int> {
+        return version.trimStart('v').split(".").map { it.toIntOrNull() ?: 0 }
+    }
+    
+    val local = parseVersion(localVersion)
+    val remote = parseVersion(remoteVersion)
+    
+    val maxSize = maxOf(local.size, remote.size)
+    for (i in 0 until maxSize) {
+        val localPart = local.getOrElse(i) { 0 }
+        val remotePart = remote.getOrElse(i) { 0 }
+        if (remotePart > localPart) return 1
+        if (remotePart < localPart) return -1
+    }
+    return 0
+}
+
+// 检查是否需要更新（根据设置的频率）
+fun checkUpdateIfNeeded(
+    context: Context,
+    viewModel: AutoCallViewModel,
+    onNewVersionFound: (version: String, content: String, url: String) -> Unit
+) {
+    GlobalScope.launch(Dispatchers.Main) {
+        val prefs = context.getSharedPreferences("update_check", Context.MODE_PRIVATE)
+        val lastCheckTime = prefs.getLong("last_check_time", 0)
+        val currentTime = System.currentTimeMillis()
+        
+        // 根据设置的频率计算需要间隔的时间
+        val interval = when (viewModel.checkUpdateInterval.value) {
+            0 -> 24 * 60 * 60 * 1000L // 每日
+            1 -> 7 * 24 * 60 * 60 * 1000L // 每周
+            2 -> 30 * 24 * 60 * 60 * 1000L // 每月
+            else -> 30 * 24 * 60 * 60 * 1000L
+        }
+        
+        // 如果距离上次检查时间超过设定间隔，则检查更新
+        if (currentTime - lastCheckTime >= interval) {
+            try {
+                withContext(Dispatchers.IO) {
+                    val client = OkHttpClient()
+                    val request = Request.Builder()
+                        .url("https://api.github.com/repos/ZHCOOL520/AUTOcall/releases/latest")
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .build()
+                    
+                    val response = client.newCall(request).execute()
+                    if (!response.isSuccessful) {
+                        throw Exception("HTTP ${response.code}")
+                    }
+                    
+                    val responseBody = response.body?.string()
+                    if (responseBody != null) {
+                        val json = JSONObject(responseBody)
+                        val version = json.getString("tag_name")
+                        val content = json.optString("body", "暂无更新说明")
+                        val htmlUrl = json.getString("html_url")
+                        
+                        withContext(Dispatchers.Main) {
+                            val currentVersion = getAppVersion(context)
+                            val compareResult = compareVersions(currentVersion, version)
+                            if (compareResult == 1) {
+                                onNewVersionFound(version, content, htmlUrl)
+                            }
+                            // 更新最后检查时间
+                            prefs.edit().putLong("last_check_time", currentTime).apply()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("UpdateCheck", "自动检查更新失败: ${e.message}")
+            }
+        }
+    }
+}
+

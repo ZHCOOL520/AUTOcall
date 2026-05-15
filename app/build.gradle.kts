@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.autocall"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 311
+        versionName = "3.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -68,6 +68,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     // JSON序列化库
     implementation("com.google.code.gson:gson:2.10.1")
+    // 网络请求库
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
