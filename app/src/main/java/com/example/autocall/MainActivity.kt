@@ -40,8 +40,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.autocall.ui.theme.AUTOCallTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -94,7 +94,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun importFromClipboard() {
-        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager
+        if (clipboard == null) {
+            viewModel.updateStatus("无法获取剪贴板服务")
+            return
+        }
         if (clipboard.hasPrimaryClip()) {
             val clipData = clipboard.primaryClip
             if (clipData != null && clipData.itemCount > 0) {
@@ -202,7 +206,8 @@ class MainActivity : ComponentActivity() {
                 else -> viewModel.updateStatus("不支持的文件格式")
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("MainActivity", "导入文件失败: ${e.message}", e)
+            viewModel.updateStatus("导入失败: ${e.message}")
         }
     }
 
@@ -556,6 +561,7 @@ fun SettingsScreen(
     val simCardMode by viewModel.simCardMode.collectAsState()
     val autoCheckUpdateEnabled by viewModel.autoCheckUpdateEnabled.collectAsState()
     val checkUpdateInterval by viewModel.checkUpdateInterval.collectAsState()
+    val callInterval by viewModel.callInterval.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
@@ -673,6 +679,41 @@ fun SettingsScreen(
                 onModeSelected = { mode -> viewModel.setSimCardMode(mode) }
             )
 
+            // 拨打间隔设置
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("⏱️ 拨打间隔设置", fontWeight = FontWeight.Bold)
+                    Text(
+                        "当前间隔: ${viewModel.getCallIntervalText()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "两次拨打之间的等待时间，确保通话记录保存完成",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(1, 2, 3, 5, 8).forEach { seconds ->
+                            FilterChip(
+                                selected = (callInterval / 1000L).toInt() == seconds,
+                                onClick = { viewModel.setCallInterval(seconds) },
+                                label = { Text("${seconds}秒") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             // 自动检查更新设置
@@ -743,7 +784,7 @@ fun SettingsScreen(
                         }
                         Button(
                             onClick = {
-                                GlobalScope.launch(Dispatchers.Main) {
+                                CoroutineScope(Dispatchers.Main).launch {
                                     isCheckingUpdate = true
                                     try {
                                         withContext(Dispatchers.IO) {
@@ -1588,7 +1629,7 @@ fun checkUpdateIfNeeded(
     viewModel: AutoCallViewModel,
     onNewVersionFound: (version: String, content: String, url: String) -> Unit
 ) {
-    GlobalScope.launch(Dispatchers.Main) {
+    CoroutineScope(Dispatchers.Main).launch {
         val prefs = context.getSharedPreferences(UPDATE_CHECK_PREFS, Context.MODE_PRIVATE)
         val lastCheckTime = prefs.getLong(LAST_CHECK_TIME_KEY, 0)
         val currentTime = System.currentTimeMillis()
@@ -1661,7 +1702,7 @@ fun downloadAndInstallApk(
     onComplete: () -> Unit = {},
     onError: () -> Unit = {}
 ) {
-    GlobalScope.launch(Dispatchers.Main) {
+    CoroutineScope(Dispatchers.Main).launch {
         try {
             withContext(Dispatchers.IO) {
                 val client = OkHttpClient()
@@ -1739,4 +1780,3 @@ fun downloadAndInstallApk(
         }
     }
 }
-

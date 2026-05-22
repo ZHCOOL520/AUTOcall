@@ -22,17 +22,20 @@ class CallStateListener(private val context: Context) {
             if (intent?.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
             val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
             val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER) ?: "未知"
+            val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+                .format(java.util.Date())
+            
             when (state) {
                 TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                    Log.d(tag, "📞 CONNECTED | 号码: $number")
+                    Log.d(tag, "[$timestamp] 📞 CONNECTED | 号码: $number")
                     channel.trySend(CallState.CONNECTED)
                 }
                 TelephonyManager.EXTRA_STATE_IDLE -> {
-                    Log.d(tag, "📴 DISCONNECTED")
+                    Log.d(tag, "[$timestamp] 📴 IDLE/DISCONNECTED | 通话结束")
                     channel.trySend(CallState.DISCONNECTED)
                 }
                 TelephonyManager.EXTRA_STATE_RINGING -> {
-                    Log.d(tag, "🔔 RINGING | 号码: $number")
+                    Log.d(tag, "[$timestamp] 🔔 RINGING | 来电号码: $number")
                     channel.trySend(CallState.RINGING)
                 }
             }

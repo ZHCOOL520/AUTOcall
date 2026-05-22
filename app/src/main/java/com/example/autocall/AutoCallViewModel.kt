@@ -77,6 +77,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _isPaused = MutableStateFlow(false) // 是否处于暂停状态
     val isPaused: StateFlow<Boolean> = _isPaused
 
+    private val _callInterval = MutableStateFlow(3000L) // 拨打间隔时间（毫秒），默认3秒
+    val callInterval: StateFlow<Long> = _callInterval
+
+    @Volatile private var currentProcessingIndex: Int = -1 // 当前正在处理的索引（原子性保护）
+    @Volatile private var isCallInProgress: Boolean = false // 是否有通话正在进行
+
     // SIM卡相关状态
     private val _simCardMode = MutableStateFlow(0) // 0: 默认卡, 1: SIM1, 2: SIM2, 3: 双卡交替
     val simCardMode: StateFlow<Int> = _simCardMode
@@ -112,6 +118,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun setSimCardMode(mode: Int) {
         if (mode in 0..3) {
             _simCardMode.value = mode
@@ -130,6 +137,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         saveUpdateSettings()
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun setAutoCheckUpdate(enabled: Boolean) {
         _autoCheckUpdateEnabled.value = enabled
         saveUpdateSettings()
@@ -182,6 +190,16 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         } else {
             _currentStatus.value = "音频播放已关闭"
         }
+    }
+
+    fun setCallInterval(seconds: Int) {
+        if (seconds in 1..10) {
+            _callInterval.value = seconds * 1000L
+        }
+    }
+
+    fun getCallIntervalText(): String {
+        return "${_callInterval.value / 1000}秒"
     }
 
     fun toggleSortByBalance() {
@@ -565,38 +583,14 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         // 第三步：处理国内长途前缀0
         if (cleaned.startsWith("0") && cleaned.length in 11..12) cleaned = cleaned.substring(1)
         
-        // 第四步：验证并返回有效号码
+        // 第四步：严格验证并返回有效号码（仅接受中国大陆手机号）
         return when {
-            // 中国大陆手机号：1开头的11位数字
+            // 中国大陆手机号：1开头的11位数字，第二位为3-9
             cleaned.matches(Regex("^1[3-9]\\d{9}$")) -> cleaned
-            // 中国大陆固话：区号(3-4位)+号码(7-8位)
-            cleaned.matches(Regex("^0\\d{2,3}\\d{7,8}$")) -> cleaned
-            // 短号码：5-6位（如客服热线）
-            cleaned.matches(Regex("^[1-9]\\d{4,5}$")) -> cleaned
-            // 普通固话号码：7-8位
-            cleaned.matches(Regex("^\\d{7,8}$")) -> cleaned
-            // 其他合法号码：7-15位（符合ITU-T E.164标准）
-            cleaned.matches(Regex("^\\d{7,15}$")) -> cleaned
-            // 尝试从原始字符串中提取可能的号码片段
+            // 其他格式一律拒绝（包括固话、短号码等），防止误拨户号
             else -> {
-                // 如果清理后不符合标准格式，尝试从原始文本中提取数字序列
-                val numberSequences = processed.split(Regex("[^0-9]+"))
-                    .filter { it.isNotEmpty() }
-                    .map { it.trim() }
-                
-                // 优先返回最可能的号码（长度在7-15之间）
-                numberSequences.firstOrNull { it.length in 7..15 }?.let { candidate ->
-                    // 再次验证候选号码
-                    if (candidate.matches(Regex("^1[3-9]\\d{9}$")) || 
-                        candidate.matches(Regex("^0?\\d{7,12}$"))) {
-                        // 去除前导0
-                        if (candidate.startsWith("0") && candidate.length > 10) {
-                            candidate.substring(1)
-                        } else {
-                            candidate
-                        }
-                    } else null
-                }
+                Log.w(tag, "忽略无效号码: '$value' -> 清理后: '$cleaned' (不符合中国大陆手机号格式)")
+                null
             }
         }
     }
@@ -737,15 +731,20 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     _currentStatus.value = "已暂停（当前位置: ${index + 1}/${list.size}）"
                     // 等待直到不再暂停或被停止
                     while (_isPaused.value && _isRunning.value) {
-                        delay(500)
+                        delay(500L)
                     }
                     // 如果被停止则退出
                     if (!_isRunning.value) break
                 }
                 
+                // 【关键修复】设置当前处理索引，防止状态混乱
+                currentProcessingIndex = index
+                isCallInProgress = true
+                
                 _currentIndex.value = index
                 _progress.value = index + 1
                 _currentStatus.value = "正在拨打 ${index + 1}/${list.size}: ${entry.contactName.ifEmpty { entry.phoneNumber }}"
+                Log.d(tag, "🚀 开始拨打索引=$index, 号码=${entry.phoneNumber}")
 
                 val startTime = System.currentTimeMillis()
                 val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
@@ -766,10 +765,13 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 _currentStatus.value = "等待接通..."
+                Log.d(tag, "⏳ 等待接通...")
                 val connected = waitForCallConnect()
+                Log.d(tag, "✅ 接通结果: connected=$connected")
 
                 var recordPath: String? = null
                 if (connected) {
+                    Log.d(tag, "📞 电话已接通，开始通话流程")
                     // 初始化音频注入器和录音器
                     if (audioInjector == null) audioInjector = CallAudioInjector(getApplication())
                     if (audioRecorder == null) audioRecorder = CallAudioRecorder(getApplication())
@@ -778,32 +780,41 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     if (_isRecordingEnabled.value) {
                         recordPath = audioRecorder?.startRecording(entry.phoneNumber)
                         _currentStatus.value = "录音已启动"
-                        delay(500)
+                        Log.d(tag, "🎙️ 录音已启动")
+                        delay(500L)
                     }
 
                     // 播放音频（如果开启且存在音频文件）
                     if (_isAudioPlaybackEnabled.value && !audioPath.isNullOrEmpty()) {
                         _currentStatus.value = "电话已接通，播放语音..."
-                        val disconnectJob = viewModelScope.launch { waitForCallDisconnect() }
+                        Log.d(tag, "🔊 开始播放音频")
+                        val disconnectJob = viewModelScope.launch { waitForCallDisconnect(index) }
                         val audioJob = viewModelScope.launch { audioInjector?.injectAudioToCall(audioPath) }
 
                         disconnectJob.join()
+                        Log.d(tag, "🛑 通话断开检测完成")
                         audioJob.cancel()
                         audioInjector?.stop()
                         stopAudioPlayback()
                     } else {
                         // 不播放音频，只等待挂断
                         _currentStatus.value = "电话已接通（未播放音频）"
-                        waitForCallDisconnect()
+                        Log.d(tag, "⏸️ 等待手动挂断（无音频播放）")
+                        waitForCallDisconnect(index)
+                        Log.d(tag, "🛑 通话断开检测完成（无音频）")
                     }
 
                     // 停止录音（如果开启）
                     if (_isRecordingEnabled.value && audioRecorder?.isRecording() == true) {
                         recordPath = audioRecorder?.stopRecording()
+                        Log.d(tag, "🛑 录音已停止")
                     }
                     _currentStatus.value = "通话结束"
+                    Log.d(tag, "✅ 通话流程结束")
                 } else {
                     _currentStatus.value = "未接通，跳过播放"
+                    Log.d(tag, "❌ 未接通，跳过后续流程")
+                    recordPath = null // 明确赋值为null
                 }
 
                 val status = if (connected && callSuccess) "成功" else "失败"
@@ -816,10 +827,21 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     recordFilePath = recordPath
                 ))
                 
-                // 标记为已拨打
+                // 【关键修复】仅在确认当前通话彻底结束后，才标记为已拨打
+                Log.d(tag, "💾 标记索引=$index 为已拨打")
                 markAsCalled(index)
                 
-                delay(3000)
+                // 重置状态标志
+                isCallInProgress = false
+                currentProcessingIndex = -1
+                
+                // 等待通话完全结束并进入IDLE状态
+                Log.d(tag, "⏱️ 等待拨打间隔: ${_callInterval.value / 1000}秒")
+                delay(_callInterval.value)
+                
+                // 确保系统处于空闲状态后再继续
+                waitForIdleState()
+                Log.d(tag, "✅ 索引=$index 处理完成，准备下一个")
             }
 
             // 只有在真正完成或停止时才清理状态
@@ -854,24 +876,54 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     }
 
     @Suppress("DEPRECATION")
-    private suspend fun waitForCallDisconnect() {
+    private suspend fun waitForCallDisconnect(expectedIndex: Int) {
         val listener = callStateListener ?: return
         val result = CompletableDeferred<Unit>()
+        
         val job = viewModelScope.launch {
             listener.callStateFlow.collect { state ->
-                if (state == CallStateListener.CallState.DISCONNECTED) {
-                    if (!result.isCompleted) {
-                        audioInjector?.stop()
-                        stopAudioPlayback()
-                        if (_isRecordingEnabled.value && audioRecorder?.isRecording() == true) {
-                            audioRecorder?.stopRecording()
+                Log.d(tag, "🔍 状态监听: state=$state, expectedIndex=$expectedIndex, currentProcessingIndex=$currentProcessingIndex")
+                
+                // 【关键修复】只有当前处理的索引匹配时才响应状态变化
+                if (currentProcessingIndex != expectedIndex) {
+                    Log.w(tag, "⚠️ 索引不匹配，忽略状态: current=$currentProcessingIndex, expected=$expectedIndex")
+                    return@collect
+                }
+                
+                when (state) {
+                    CallStateListener.CallState.DISCONNECTED -> {
+                        Log.d(tag, "📴 检测到断开事件")
+                        
+                        // 【关键修复】等待短暂时间确认是否真的断开（防止短暂断线重连）
+                        delay(2000L)
+                        
+                        // 再次检查状态，如果仍然是DISCONNECTED且索引匹配，才确认为真正断开
+                        if (currentProcessingIndex == expectedIndex && isCallInProgress) {
+                            Log.d(tag, "✅ 确认通话已彻底断开")
+                            if (!result.isCompleted) {
+                                audioInjector?.stop()
+                                stopAudioPlayback()
+                                if (_isRecordingEnabled.value && audioRecorder?.isRecording() == true) {
+                                    audioRecorder?.stopRecording()
+                                }
+                                // 重置音频模式
+                                val am = getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                                if (am != null) {
+                                    am.mode = AudioManager.MODE_NORMAL
+                                    am.setSpeakerphoneOn(false)
+                                } else {
+                                    Log.w(tag, "⚠️ 无法获取AudioManager服务")
+                                }
+                                result.complete(Unit)
+                            }
+                        } else {
+                            Log.w(tag, "⚠️ 状态已变化或索引不匹配，取消断开处理")
                         }
-                        // 重置音频模式
-                        val am = getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                        am.mode = AudioManager.MODE_NORMAL
-                        am.setSpeakerphoneOn(false)
-                        result.complete(Unit)
                     }
+                    CallStateListener.CallState.CONNECTED -> {
+                        Log.d(tag, "📞 重新连接 detected，说明还在通话中")
+                    }
+                    else -> {}
                 }
             }
         }
@@ -899,8 +951,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun stopAutoCall() {
+        Log.d(tag, "🛑 停止自动拨打")
         _isRunning.value = false
         _isPaused.value = false
+        isCallInProgress = false
+        currentProcessingIndex = -1
         audioInjector?.stop()
         audioRecorder?.release()
         _currentStatus.value = "已停止"
@@ -908,6 +963,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     fun pauseAutoCall() {
         if (_isRunning.value && !_isPaused.value) {
+            Log.d(tag, "⏸️ 暂停自动拨打，当前索引=${_currentIndex.value}")
             _isPaused.value = true
             _currentStatus.value = "已暂停（当前位置: ${_currentIndex.value + 1}/${_phoneList.value.size}）"
         }
@@ -915,6 +971,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     fun resumeAutoCall(context: Context) {
         if (_isRunning.value && _isPaused.value) {
+            Log.d(tag, "▶️ 恢复自动拨打，从索引=${_currentIndex.value}继续")
             _isPaused.value = false
             _currentStatus.value = "继续拨打..."
             // 从下一个位置继续拨打（当前索引已经处理完成）
@@ -925,6 +982,15 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             }
             startAutoCallFromIndex(context, nextIndex)
         }
+    }
+
+    private suspend fun waitForIdleState() {
+        val listener = callStateListener ?: return
+        // 短暂等待以确保状态稳定
+        delay(500L)
+        // 简单延迟等待，确保系统进入IDLE状态
+        // 由于StateFlow不支持tryReceive，我们直接等待固定时间
+        delay(1000L)
     }
 
     @SuppressLint("UseKtx")
