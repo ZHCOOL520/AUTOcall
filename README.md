@@ -1,5 +1,14 @@
 # 自动电话拨打系统 (AUTOcall)
 
+> ## ⚖️ **安全声明与免责提示**
+>
+> - 📚 **使用目的**：本软件仅供**学习与技术研究**使用
+> - 🚫 **严禁非法用途**：**禁止**用于骚扰、诈骗、恶意营销等任何违法行为
+> - ⚖️ **法律责任**：使用者需**自行承担全部法律责任**，开发者不承担任何连带责任
+> - 🔒 **隐私保护**：请遵守当地法律法规，**尊重他人隐私权**
+>
+> **❗ 下载即表示您已阅读并同意以上声明**
+
 ![Version](https://img.shields.io/badge/version-4.0.0-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
