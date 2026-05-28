@@ -9,7 +9,7 @@
 >
 > **❗ 下载即表示您已阅读并同意以上声明**
 
-![Version](https://img.shields.io/badge/version-4.0.0-blue)
+![Version](https://img.shields.io/badge/version-4.1.0-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
 
@@ -109,6 +109,15 @@
 ---
 
 ## 🔄 更新日志
+
+### v4.1.0 (2026-05-29) - **新功能**
+
+- 🌐 **多语言支持**：新增中英文切换功能，界面文本支持实时语言切换
+- 🌐 **国际化框架**：集成 LanguageManager 语言管理器，基于 JSON 配置文件实现动态翻译
+- 📝 **语言资源文件**：添加 zh.json/en.json，覆盖所有 UI 组件文本
+- 🔧 **组件更新**：替换废弃的 Divider 组件为 HorizontalDivider
+
+---
 
 # ⚠️⚠️⚠️ v4.0.0 (2026-05-23) - **重要版本** ⚠️⚠️⚠️
 

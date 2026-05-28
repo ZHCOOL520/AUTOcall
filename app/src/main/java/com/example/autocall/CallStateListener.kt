@@ -21,21 +21,21 @@ class CallStateListener(private val context: Context) {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
             val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
-            val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER) ?: "未知"
+            val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER) ?: LanguageManager.getString("status.unknown")
             val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
                 .format(java.util.Date())
             
             when (state) {
                 TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                    Log.d(tag, "[$timestamp] 📞 CONNECTED | 号码: $number")
+                    Log.d(tag, "[$timestamp] 📞 CONNECTED | ${LanguageManager.getString("log.number")}: $number")
                     channel.trySend(CallState.CONNECTED)
                 }
                 TelephonyManager.EXTRA_STATE_IDLE -> {
-                    Log.d(tag, "[$timestamp] 📴 IDLE/DISCONNECTED | 通话结束")
+                    Log.d(tag, "[$timestamp] 📴 IDLE/DISCONNECTED | ${LanguageManager.getString("log.call_ended")}")
                     channel.trySend(CallState.DISCONNECTED)
                 }
                 TelephonyManager.EXTRA_STATE_RINGING -> {
-                    Log.d(tag, "[$timestamp] 🔔 RINGING | 来电号码: $number")
+                    Log.d(tag, "[$timestamp] 🔔 RINGING | ${LanguageManager.getString("log.incoming_number")}: $number")
                     channel.trySend(CallState.RINGING)
                 }
             }
@@ -47,7 +47,7 @@ class CallStateListener(private val context: Context) {
         if (isRegistered) return
         context.registerReceiver(receiver, IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED))
         isRegistered = true
-        Log.d(tag, "监听已注册")
+        Log.d(tag, LanguageManager.getString("log.listener_registered"))
     }
 
     @Synchronized
@@ -55,14 +55,14 @@ class CallStateListener(private val context: Context) {
         if (!isRegistered) return
         try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
         isRegistered = false
-        Log.d(tag, "监听已注销")
+        Log.d(tag, LanguageManager.getString("log.listener_unregistered"))
     }
 
     @Synchronized
     fun close() {
         unregister()
         channel.close()
-        Log.d(tag, "Channel已关闭")
+        Log.d(tag, LanguageManager.getString("log.channel_closed"))
     }
 
     enum class CallState { RINGING, CONNECTED, DISCONNECTED }

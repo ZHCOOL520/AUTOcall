@@ -27,7 +27,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _phoneList = MutableStateFlow<List<PhoneEntry>>(emptyList())
     val phoneList: StateFlow<List<PhoneEntry>> = _phoneList
 
-    private val _currentStatus = MutableStateFlow("准备就绪")
+    private val _currentStatus = MutableStateFlow(LanguageManager.getString("status.ready"))
     val currentStatus: StateFlow<String> = _currentStatus
 
     fun updateStatus(status: String) {
@@ -97,6 +97,10 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _checkUpdateInterval = MutableStateFlow(2) // 0: 每日, 1: 每周, 2: 每月
     val checkUpdateInterval: StateFlow<Int> = _checkUpdateInterval
 
+    // 语言设置相关状态
+    private val _selectedLanguage = MutableStateFlow("zh") // "zh": 中文, "en": English
+    val selectedLanguage: StateFlow<String> = _selectedLanguage
+
     private val prefs by lazy {
         getApplication<Application>().getSharedPreferences("app_data", Context.MODE_PRIVATE)
     }
@@ -104,6 +108,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     init {
         loadData()
         loadUpdateSettings()
+        loadLanguageSettings()
     }
 
     fun toggleSimCardMode() {
@@ -111,10 +116,10 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         _simCardMode.value = (_simCardMode.value + 1) % 4
         _currentSimCard.value = 0 // 重置当前卡
         when (_simCardMode.value) {
-            0 -> _currentStatus.value = "已设置为默认SIM卡"
-            1 -> _currentStatus.value = "已设置为使用SIM卡1"
-            2 -> _currentStatus.value = "已设置为使用SIM卡2"
-            3 -> _currentStatus.value = "已设置为双卡交替拨打"
+            0 -> _currentStatus.value = LanguageManager.getString("sim_card.status_default")
+            1 -> _currentStatus.value = LanguageManager.getString("sim_card.status_sim1")
+            2 -> _currentStatus.value = LanguageManager.getString("sim_card.status_sim2")
+            3 -> _currentStatus.value = LanguageManager.getString("sim_card.status_alternate")
         }
     }
 
@@ -124,10 +129,10 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             _simCardMode.value = mode
             _currentSimCard.value = 0
             when (mode) {
-                0 -> _currentStatus.value = "已设置为默认SIM卡"
-                1 -> _currentStatus.value = "已设置为使用SIM卡1"
-                2 -> _currentStatus.value = "已设置为使用SIM卡2"
-                3 -> _currentStatus.value = "已设置为双卡交替拨打"
+                0 -> _currentStatus.value = LanguageManager.getString("sim_card.status_default")
+                1 -> _currentStatus.value = LanguageManager.getString("sim_card.status_sim1")
+                2 -> _currentStatus.value = LanguageManager.getString("sim_card.status_sim2")
+                3 -> _currentStatus.value = LanguageManager.getString("sim_card.status_alternate")
             }
         }
     }
@@ -150,6 +155,39 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setLanguage(languageCode: String) {
+        if (languageCode in listOf("zh", "en")) {
+            _selectedLanguage.value = languageCode
+            // 更新LanguageManager
+            try {
+                LanguageManager.switchLanguage(getApplication<Application>(), languageCode)
+            } catch (e: Exception) {
+                Log.e(tag, "Error switching language", e)
+            }
+            // 刷新所有已计算的本地化字符串，确保UI立即更新
+            refreshLocalizedStrings()
+            saveLanguageSettings()
+        }
+    }
+    
+    /**
+     * 刷新所有已计算的本地化字符串（语言切换后调用）
+     */
+    private fun refreshLocalizedStrings() {
+        // 刷新状态消息（仅在空闲时刷新，避免打断正在进行的操作）
+        if (!_isRunning.value) {
+            _currentStatus.value = LanguageManager.getString("status.ready")
+        }
+        // 刷新统计信息
+        if (_callRecords.value.isNotEmpty()) {
+            generateStatistics(_callRecords.value)
+        }
+    }
+
+    fun getLanguageText(): String {
+        return LanguageManager.getLanguageDisplayName(_selectedLanguage.value)
+    }
+
     private fun saveUpdateSettings() {
         viewModelScope.launch(Dispatchers.IO) {
             prefs.edit()
@@ -161,11 +199,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     fun getSimCardModeText(): String {
         return when (_simCardMode.value) {
-            0 -> "默认卡"
-            1 -> "SIM卡1"
-            2 -> "SIM卡2"
-            3 -> "双卡交替"
-            else -> "默认卡"
+            0 -> LanguageManager.getString("sim_card.mode_default")
+            1 -> LanguageManager.getString("sim_card.mode_sim1")
+            2 -> LanguageManager.getString("sim_card.mode_sim2")
+            3 -> LanguageManager.getString("sim_card.mode_alternate")
+            else -> LanguageManager.getString("sim_card.mode_default")
         }
     }
 
@@ -173,9 +211,9 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         val newState = !_isRecordingEnabled.value
         _isRecordingEnabled.value = newState
         if (newState) {
-            _currentStatus.value = "录音已开启（将在下次通话时启动）"
+            _currentStatus.value = LanguageManager.getString("status.recording_enabled")
         } else {
-            _currentStatus.value = "录音已关闭"
+            _currentStatus.value = LanguageManager.getString("status.recording_disabled")
             if (audioRecorder?.isRecording() == true) {
                 audioRecorder?.stopRecording()
             }
@@ -186,9 +224,9 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         val newState = !_isAudioPlaybackEnabled.value
         _isAudioPlaybackEnabled.value = newState
         if (newState) {
-            _currentStatus.value = "音频播放已开启（将在下次通话时播放）"
+            _currentStatus.value = LanguageManager.getString("status.audio_playback_enabled")
         } else {
-            _currentStatus.value = "音频播放已关闭"
+            _currentStatus.value = LanguageManager.getString("status.audio_playback_disabled")
         }
     }
 
@@ -199,7 +237,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getCallIntervalText(): String {
-        return "${_callInterval.value / 1000}秒"
+        return LanguageManager.getString("status.call_interval_seconds", _callInterval.value / 1000)
     }
 
     fun toggleSortByBalance() {
@@ -207,9 +245,9 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         _sortByBalance.value = (_sortByBalance.value + 1) % 3
         sortPhoneList()
         when (_sortByBalance.value) {
-            0 -> _currentStatus.value = "已取消余额排序"
-            1 -> _currentStatus.value = "已按余额从小到大排序"
-            2 -> _currentStatus.value = "已按余额从大到小排序"
+            0 -> _currentStatus.value = LanguageManager.getString("status.sort_balance_cancelled")
+            1 -> _currentStatus.value = LanguageManager.getString("status.sort_balance_asc")
+            2 -> _currentStatus.value = LanguageManager.getString("status.sort_balance_desc")
         }
     }
 
@@ -218,9 +256,9 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         _sortByCallCount.value = (_sortByCallCount.value + 1) % 3
         sortPhoneList()
         when (_sortByCallCount.value) {
-            0 -> _currentStatus.value = "已取消拨打次数排序"
-            1 -> _currentStatus.value = "已按拨打次数从小到大排序"
-            2 -> _currentStatus.value = "已按拨打次数从大到小排序"
+            0 -> _currentStatus.value = LanguageManager.getString("status.sort_call_count_cancelled")
+            1 -> _currentStatus.value = LanguageManager.getString("status.sort_call_count_asc")
+            2 -> _currentStatus.value = LanguageManager.getString("status.sort_call_count_desc")
         }
     }
 
@@ -297,7 +335,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     fun clearPhoneList() {
         _phoneList.value = emptyList()
-        _currentStatus.value = "列表已清空"
+        _currentStatus.value = LanguageManager.getString("status.list_cleared")
         saveData()
     }
 
@@ -326,7 +364,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(tag, "复制示例音频失败: ${e.message}")
+                    Log.e(tag, LanguageManager.getString("log.copy_sample_audio_failed", e.message ?: ""))
                 }
             }
         }
@@ -352,7 +390,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             try {
                 val file = File(excelFilePath)
                 if (!file.exists()) {
-                    withContext(Dispatchers.Main) { _currentStatus.value = "Excel文件不存在" }
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.excel_not_found") }
                     return@launch
                 }
                 val inputStream = FileInputStream(file)
@@ -388,12 +426,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 inputStream.close()
                 withContext(Dispatchers.Main) {
                     _phoneList.value = phoneList
-                    _currentStatus.value = "成功导入 ${phoneList.size} 个电话"
+                    _currentStatus.value = LanguageManager.getString("status.import_success", phoneList.size)
                     saveData()
                 }
             } catch (e: Exception) {
-                Log.e(tag, "导入Excel失败: ${e.message}")
-                withContext(Dispatchers.Main) { _currentStatus.value = "导入失败: ${e.message}" }
+                Log.e(tag, LanguageManager.getString("log.import_excel_failed", e.message ?: ""))
+                withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.import_failed", e.message ?: "") }
                 workbook?.close()
             }
         }
@@ -404,14 +442,14 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             try {
                 val file = File(csvFilePath)
                 if (!file.exists()) {
-                    withContext(Dispatchers.Main) { _currentStatus.value = "CSV文件不存在" }
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.csv_not_found") }
                     return@launch
                 }
                 val reader = CSVReader(FileReader(file))
                 val allRows = reader.readAll()
                 reader.close()
                 if (allRows.isEmpty()) {
-                    withContext(Dispatchers.Main) { _currentStatus.value = "CSV文件为空" }
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.csv_empty") }
                     return@launch
                 }
                 val phoneList = mutableListOf<PhoneEntry>()
@@ -467,12 +505,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 }
                 withContext(Dispatchers.Main) {
                     _phoneList.value = phoneList
-                    _currentStatus.value = "成功导入 ${phoneList.size} 个电话"
+                    _currentStatus.value = LanguageManager.getString("status.import_success", phoneList.size)
                     saveData()
                 }
             } catch (e: Exception) {
-                Log.e(tag, "导入CSV失败: ${e.message}")
-                withContext(Dispatchers.Main) { _currentStatus.value = "导入失败: ${e.message}" }
+                Log.e(tag, LanguageManager.getString("log.import_csv_failed", e.message ?: ""))
+                withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.import_failed", e.message ?: "") }
             }
         }
     }
@@ -481,7 +519,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (clipboardText.isBlank()) {
-                    withContext(Dispatchers.Main) { _currentStatus.value = "剪贴板内容为空" }
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.clipboard_empty") }
                     return@launch
                 }
                 
@@ -504,7 +542,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 }
                 
                 if (phoneList.isEmpty()) {
-                    withContext(Dispatchers.Main) { _currentStatus.value = "未在剪贴板中找到有效电话号码" }
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.clipboard_no_phone") }
                     return@launch
                 }
                 
@@ -513,12 +551,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     val currentList = _phoneList.value.toMutableList()
                     currentList.addAll(phoneList)
                     _phoneList.value = currentList
-                    _currentStatus.value = "从剪贴板导入 ${phoneList.size} 个电话"
+                    _currentStatus.value = LanguageManager.getString("status.clipboard_import_success", phoneList.size)
                     saveData()
                 }
             } catch (e: Exception) {
-                Log.e(tag, "从剪贴板导入失败: ${e.message}")
-                withContext(Dispatchers.Main) { _currentStatus.value = "导入失败: ${e.message}" }
+                Log.e(tag, LanguageManager.getString("log.clipboard_import_failed", e.message ?: ""))
+                withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.import_failed", e.message ?: "") }
             }
         }
     }
@@ -589,7 +627,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             cleaned.matches(Regex("^1[3-9]\\d{9}$")) -> cleaned
             // 其他格式一律拒绝（包括固话、短号码等），防止误拨户号
             else -> {
-                Log.w(tag, "忽略无效号码: '$value' -> 清理后: '$cleaned' (不符合中国大陆手机号格式)")
+                Log.w(tag, LanguageManager.getString("log.invalid_number", value, cleaned))
                 null
             }
         }
@@ -650,7 +688,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             try {
                 val fileName = getFileNameFromUri(context, uri)
                 if (!isSupportedAudioFormat(fileName)) {
-                    withContext(Dispatchers.Main) { _currentStatus.value = "不支持的音频格式" }
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.audio_format_unsupported") }
                     return@launch
                 }
                 if (audioDirectory == null) {
@@ -673,11 +711,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 val newIndex = sampleAudios.size + (newList.size - 1)
                 withContext(Dispatchers.Main) {
                     _selectedAudioIndex.value = newIndex
-                    _currentStatus.value = "音频导入成功: ${destFile.name}"
+                    _currentStatus.value = LanguageManager.getString("status.audio_import_success", destFile.name)
                 }
             } catch (e: Exception) {
-                Log.e(tag, "导入音频失败: ${e.message}")
-                withContext(Dispatchers.Main) { _currentStatus.value = "导入音频失败: ${e.message}" }
+                Log.e(tag, LanguageManager.getString("log.audio_import_failed", e.message ?: ""))
+                withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.audio_import_failed", e.message ?: "") }
             }
         }
         return true
@@ -709,7 +747,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             _isPaused.value = false
             val list = _phoneList.value
             if (list.isEmpty()) {
-                _currentStatus.value = "电话列表为空"
+                _currentStatus.value = LanguageManager.getString("status.phone_list_empty")
                 _isRunning.value = false
                 return@launch
             }
@@ -719,7 +757,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             callStateListener = CallStateListener(getApplication()).also { it.register() }
 
             val records = mutableListOf<CallRecord>()
-            _currentStatus.value = "开始自动拨打，共 ${list.size} 个电话，从第 ${startIndex + 1} 个开始"
+            _currentStatus.value = LanguageManager.getString("status.auto_call_started", list.size, startIndex + 1)
 
             for ((index, entry) in list.withIndex()) {
                 if (index < startIndex) continue // 跳过已经拨打过的
@@ -728,7 +766,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 if (!_isRunning.value) break
                 if (_isPaused.value) {
                     // 暂停状态下，保持_isRunning为true，等待恢复
-                    _currentStatus.value = "已暂停（当前位置: ${index + 1}/${list.size}）"
+                    _currentStatus.value = LanguageManager.getString("status.paused_at", index + 1, list.size)
                     // 等待直到不再暂停或被停止
                     while (_isPaused.value && _isRunning.value) {
                         delay(500L)
@@ -743,8 +781,8 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 
                 _currentIndex.value = index
                 _progress.value = index + 1
-                _currentStatus.value = "正在拨打 ${index + 1}/${list.size}: ${entry.contactName.ifEmpty { entry.phoneNumber }}"
-                Log.d(tag, "🚀 开始拨打索引=$index, 号码=${entry.phoneNumber}")
+                _currentStatus.value = LanguageManager.getString("status.dialing", index + 1, list.size, entry.contactName.ifEmpty { entry.phoneNumber })
+                Log.d(tag, LanguageManager.getString("log.start_dial_index", index, entry.phoneNumber))
 
                 val startTime = System.currentTimeMillis()
                 val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
@@ -764,14 +802,14 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     else -> makeCall(context, entry.phoneNumber) // 默认卡
                 }
 
-                _currentStatus.value = "等待接通..."
-                Log.d(tag, "⏳ 等待接通...")
+                _currentStatus.value = LanguageManager.getString("status.waiting_connect")
+                Log.d(tag, LanguageManager.getString("log.waiting_connect"))
                 val connected = waitForCallConnect()
-                Log.d(tag, "✅ 接通结果: connected=$connected")
+                Log.d(tag, LanguageManager.getString("log.connect_result", connected))
 
                 var recordPath: String? = null
                 if (connected) {
-                    Log.d(tag, "📞 电话已接通，开始通话流程")
+                    Log.d(tag, LanguageManager.getString("log.call_connected"))
                     // 初始化音频注入器和录音器
                     if (audioInjector == null) audioInjector = CallAudioInjector(getApplication())
                     if (audioRecorder == null) audioRecorder = CallAudioRecorder(getApplication())
@@ -779,48 +817,48 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     // 启动录音（如果开启）
                     if (_isRecordingEnabled.value) {
                         recordPath = audioRecorder?.startRecording(entry.phoneNumber)
-                        _currentStatus.value = "录音已启动"
-                        Log.d(tag, "🎙️ 录音已启动")
+                        _currentStatus.value = LanguageManager.getString("status.recording_started")
+                        Log.d(tag, LanguageManager.getString("log.recording_started"))
                         delay(500L)
                     }
 
                     // 播放音频（如果开启且存在音频文件）
                     if (_isAudioPlaybackEnabled.value && !audioPath.isNullOrEmpty()) {
-                        _currentStatus.value = "电话已接通，播放语音..."
-                        Log.d(tag, "🔊 开始播放音频")
+                        _currentStatus.value = LanguageManager.getString("status.call_connected_playing")
+                        Log.d(tag, LanguageManager.getString("log.start_playing_audio"))
                         val disconnectJob = viewModelScope.launch { waitForCallDisconnect(index) }
                         val audioJob = viewModelScope.launch { audioInjector?.injectAudioToCall(audioPath) }
 
                         disconnectJob.join()
-                        Log.d(tag, "🛑 通话断开检测完成")
+                        Log.d(tag, LanguageManager.getString("log.disconnect_detected"))
                         audioJob.cancel()
                         audioInjector?.stop()
                         stopAudioPlayback()
                     } else {
                         // 不播放音频，只等待挂断
-                        _currentStatus.value = "电话已接通（未播放音频）"
-                        Log.d(tag, "⏸️ 等待手动挂断（无音频播放）")
+                        _currentStatus.value = LanguageManager.getString("status.call_connected_no_audio")
+                        Log.d(tag, LanguageManager.getString("log.waiting_manual_hangup"))
                         waitForCallDisconnect(index)
-                        Log.d(tag, "🛑 通话断开检测完成（无音频）")
+                        Log.d(tag, LanguageManager.getString("log.disconnect_detected_no_audio"))
                     }
 
                     // 停止录音（如果开启）
                     if (_isRecordingEnabled.value && audioRecorder?.isRecording() == true) {
                         recordPath = audioRecorder?.stopRecording()
-                        Log.d(tag, "🛑 录音已停止")
+                        Log.d(tag, LanguageManager.getString("log.recording_stopped"))
                     }
-                    _currentStatus.value = "通话结束"
-                    Log.d(tag, "✅ 通话流程结束")
+                    _currentStatus.value = LanguageManager.getString("status.call_ended")
+                    Log.d(tag, LanguageManager.getString("log.call_flow_end"))
                 } else {
-                    _currentStatus.value = "未接通，跳过播放"
-                    Log.d(tag, "❌ 未接通，跳过后续流程")
+                    _currentStatus.value = LanguageManager.getString("status.call_not_connected")
+                    Log.d(tag, LanguageManager.getString("log.not_connected_skip"))
                     recordPath = null // 明确赋值为null
                 }
 
-                val status = if (connected && callSuccess) "成功" else "失败"
+                val status = if (connected && callSuccess) LanguageManager.getString("status.call_success") else LanguageManager.getString("status.call_failed")
                 records.add(CallRecord(
                     phoneNumber = entry.phoneNumber,
-                    contactName = entry.contactName.ifEmpty { "未知" },
+                    contactName = entry.contactName.ifEmpty { LanguageManager.getString("status.unknown") },
                     callStatus = status,
                     callDuration = (System.currentTimeMillis() - startTime) / 1000,
                     timestamp = timestamp,
@@ -828,7 +866,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 ))
                 
                 // 【关键修复】仅在确认当前通话彻底结束后，才标记为已拨打
-                Log.d(tag, "💾 标记索引=$index 为已拨打")
+                Log.d(tag, LanguageManager.getString("log.mark_index_called", index))
                 markAsCalled(index)
                 
                 // 重置状态标志
@@ -836,12 +874,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 currentProcessingIndex = -1
                 
                 // 等待通话完全结束并进入IDLE状态
-                Log.d(tag, "⏱️ 等待拨打间隔: ${_callInterval.value / 1000}秒")
+                Log.d(tag, LanguageManager.getString("log.wait_call_interval", _callInterval.value / 1000))
                 delay(_callInterval.value)
                 
                 // 确保系统处于空闲状态后再继续
                 waitForIdleState()
-                Log.d(tag, "✅ 索引=$index 处理完成，准备下一个")
+                Log.d(tag, LanguageManager.getString("log.index_completed", index))
             }
 
             // 只有在真正完成或停止时才清理状态
@@ -850,7 +888,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 callStateListener = null
                 _callRecords.value = records
                 generateStatistics(records)
-                _currentStatus.value = "全部拨打完成"
+                _currentStatus.value = LanguageManager.getString("status.all_completed")
                 _isRunning.value = false
             }
         }
@@ -882,24 +920,24 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         
         val job = viewModelScope.launch {
             listener.callStateFlow.collect { state ->
-                Log.d(tag, "🔍 状态监听: state=$state, expectedIndex=$expectedIndex, currentProcessingIndex=$currentProcessingIndex")
+                Log.d(tag, LanguageManager.getString("log.state_monitor", state, expectedIndex, currentProcessingIndex))
                 
                 // 【关键修复】只有当前处理的索引匹配时才响应状态变化
                 if (currentProcessingIndex != expectedIndex) {
-                    Log.w(tag, "⚠️ 索引不匹配，忽略状态: current=$currentProcessingIndex, expected=$expectedIndex")
+                    Log.w(tag, LanguageManager.getString("log.index_mismatch_skip", currentProcessingIndex, expectedIndex))
                     return@collect
                 }
                 
                 when (state) {
                     CallStateListener.CallState.DISCONNECTED -> {
-                        Log.d(tag, "📴 检测到断开事件")
+                        Log.d(tag, LanguageManager.getString("log.disconnect_event_detected"))
                         
                         // 【关键修复】等待短暂时间确认是否真的断开（防止短暂断线重连）
                         delay(2000L)
                         
                         // 再次检查状态，如果仍然是DISCONNECTED且索引匹配，才确认为真正断开
                         if (currentProcessingIndex == expectedIndex && isCallInProgress) {
-                            Log.d(tag, "✅ 确认通话已彻底断开")
+                            Log.d(tag, LanguageManager.getString("log.confirmed_disconnect"))
                             if (!result.isCompleted) {
                                 audioInjector?.stop()
                                 stopAudioPlayback()
@@ -912,16 +950,16 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                                     am.mode = AudioManager.MODE_NORMAL
                                     am.setSpeakerphoneOn(false)
                                 } else {
-                                    Log.w(tag, "⚠️ 无法获取AudioManager服务")
+                                    Log.w(tag, LanguageManager.getString("log.cannot_get_audio_manager"))
                                 }
                                 result.complete(Unit)
                             }
                         } else {
-                            Log.w(tag, "⚠️ 状态已变化或索引不匹配，取消断开处理")
+                            Log.w(tag, LanguageManager.getString("log.state_changed_or_mismatch"))
                         }
                     }
                     CallStateListener.CallState.CONNECTED -> {
-                        Log.d(tag, "📞 重新连接 detected，说明还在通话中")
+                        Log.d(tag, LanguageManager.getString("log.reconnect_detected"))
                     }
                     else -> {}
                 }
@@ -944,36 +982,36 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     private fun generateStatistics(records: List<CallRecord>) {
         val total = records.size
-        val success = records.count { it.callStatus == "成功" }
+        val success = records.count { it.callStatus == LanguageManager.getString("status.call_success") }
         val failed = total - success
         val totalDuration = records.sumOf { it.callDuration }
-        _statistics.value = "总计: $total | 成功: $success | 失败: $failed | 总时长: ${totalDuration}秒"
+        _statistics.value = LanguageManager.getString("status.statistics", total, success, failed, totalDuration)
     }
 
     fun stopAutoCall() {
-        Log.d(tag, "🛑 停止自动拨打")
+        Log.d(tag, LanguageManager.getString("log.stop_auto_call"))
         _isRunning.value = false
         _isPaused.value = false
         isCallInProgress = false
         currentProcessingIndex = -1
         audioInjector?.stop()
         audioRecorder?.release()
-        _currentStatus.value = "已停止"
+        _currentStatus.value = LanguageManager.getString("status.stopped")
     }
 
     fun pauseAutoCall() {
         if (_isRunning.value && !_isPaused.value) {
-            Log.d(tag, "⏸️ 暂停自动拨打，当前索引=${_currentIndex.value}")
+            Log.d(tag, LanguageManager.getString("log.pause_auto_call", _currentIndex.value))
             _isPaused.value = true
-            _currentStatus.value = "已暂停（当前位置: ${_currentIndex.value + 1}/${_phoneList.value.size}）"
+            _currentStatus.value = LanguageManager.getString("status.paused_at", _currentIndex.value + 1, _phoneList.value.size)
         }
     }
 
     fun resumeAutoCall(context: Context) {
         if (_isRunning.value && _isPaused.value) {
-            Log.d(tag, "▶️ 恢复自动拨打，从索引=${_currentIndex.value}继续")
+            Log.d(tag, LanguageManager.getString("log.resume_auto_call", _currentIndex.value))
             _isPaused.value = false
-            _currentStatus.value = "继续拨打..."
+            _currentStatus.value = LanguageManager.getString("status.resuming")
             // 从下一个位置继续拨打（当前索引已经处理完成）
             val nextIndex = if (_currentIndex.value + 1 < _phoneList.value.size) {
                 _currentIndex.value + 1
@@ -1003,7 +1041,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             context.startActivity(intent)
             true
         } catch (e: Exception) {
-            _currentStatus.value = "拨打失败: ${e.message}"
+            _currentStatus.value = LanguageManager.getString("status.dial_failed", e.message ?: "")
             false
         }
     }
@@ -1032,18 +1070,18 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                                     putExtra("subscription", subscriptionInfo.subscriptionId)
                                 }
                             } else {
-                                Log.w(tag, "缺少READ_PHONE_STATE权限，使用默认拨号")
+                                Log.w(tag, LanguageManager.getString("log.missing_read_phone_state"))
                             }
                         }
                     } catch (e: SecurityException) {
-                        Log.e(tag, "权限不足: ${e.message}")
+                        Log.e(tag, LanguageManager.getString("log.permission_insufficient", e.message ?: ""))
                         // 降级方案：使用旧的extra参数
                         putExtra("com.android.phone.force.slot", true)
                         putExtra("Cdma_Supp", true)
                         putExtra("slot", simSlot)
                         putExtra("simSlot", simSlot)
                     } catch (e: Exception) {
-                        Log.e(tag, "获取SubscriptionInfo失败: ${e.message}")
+                        Log.e(tag, LanguageManager.getString("log.get_subscription_info_failed", e.message ?: ""))
                         // 降级方案：使用旧的extra参数
                         putExtra("com.android.phone.force.slot", true)
                         putExtra("Cdma_Supp", true)
@@ -1053,10 +1091,10 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 }
             }
             context.startActivity(intent)
-            _currentStatus.value = "使用${if (simSlot == 0) "SIM卡1" else "SIM卡2"}拨打"
+            _currentStatus.value = LanguageManager.getString("sim_card.using_sim", if (simSlot == 0) LanguageManager.getString("sim_card.mode_sim1") else LanguageManager.getString("sim_card.mode_sim2"))
             true
         } catch (e: Exception) {
-            _currentStatus.value = "拨打失败: ${e.message}"
+            _currentStatus.value = LanguageManager.getString("status.dial_failed", e.message ?: "")
             false
         }
     }
@@ -1072,7 +1110,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             try {
                 val phoneList = _phoneList.value
                 if (phoneList.isEmpty()) {
-                    withContext(Dispatchers.Main) { _currentStatus.value = "没有可导出的联系人" }
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.no_contacts_to_export") }
                     return@launch
                 }
                 context.contentResolver.openOutputStream(uri)?.use { os ->
@@ -1082,11 +1120,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     
                     // CSV头部（使用逗号分隔，Windows Excel兼容）
                     writer.write("\uFEFF") // BOM标记
-                    writer.write("姓名,手机号,余额,户号,拨打次数\r\n")
+                    writer.write(LanguageManager.getString("status.csv_header") + "\r\n")
                     
                     // 写入联系人数据
                     phoneList.forEach { entry ->
-                        val name = escapeCsvField(entry.contactName.ifEmpty { "未知" })
+                        val name = escapeCsvField(entry.contactName.ifEmpty { LanguageManager.getString("status.unknown") })
                         val phone = escapeCsvField(entry.phoneNumber)
                         val balance = escapeCsvField(entry.balance ?: "")
                         val accountNumber = escapeCsvField(entry.accountNumber ?: "")
@@ -1098,11 +1136,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     writer.flush()
                 }
                 withContext(Dispatchers.Main) { 
-                    _currentStatus.value = "导出成功，共 ${phoneList.size} 条记录"
+                    _currentStatus.value = LanguageManager.getString("status.export_success", phoneList.size)
                 }
             } catch (e: Exception) {
-                Log.e(tag, "导出失败: ${e.message}")
-                withContext(Dispatchers.Main) { _currentStatus.value = "导出失败: ${e.message}" }
+                Log.e(tag, LanguageManager.getString("log.export_failed", e.message ?: ""))
+                withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.export_failed", e.message ?: "") }
             }
         }
     }
@@ -1141,7 +1179,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 // 保存统计信息
                 prefs.edit().putString("statistics", _statistics.value).apply()
             } catch (e: Exception) {
-                Log.e(tag, "保存数据失败: ${e.message}")
+                Log.e(tag, LanguageManager.getString("log.save_data_failed", e.message ?: ""))
             }
         }
     }
@@ -1178,7 +1216,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
             } catch (e: Exception) {
-                Log.e(tag, "加载数据失败: ${e.message}")
+                Log.e(tag, LanguageManager.getString("log.load_data_failed", e.message ?: ""))
             }
         }
     }
@@ -1193,7 +1231,47 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     _checkUpdateInterval.value = interval
                 }
             } catch (e: Exception) {
-                Log.e(tag, "加载更新设置失败: ${e.message}")
+                Log.e(tag, LanguageManager.getString("log.load_update_settings_failed", e.message ?: ""))
+            }
+        }
+    }
+
+    private fun saveLanguageSettings() {
+        viewModelScope.launch(Dispatchers.IO) {
+            prefs.edit()
+                .putString("app_language", _selectedLanguage.value)
+                .apply()
+        }
+    }
+
+    private fun loadLanguageSettings() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 检查是否有保存的语言设置
+                val hasSavedLanguage = prefs.contains("app_language")
+                
+                val language = if (hasSavedLanguage) {
+                    // 使用保存的设置
+                    prefs.getString("app_language", "zh") ?: "zh"
+                } else {
+                    // 首次启动，根据系统语言自动选择
+                    val systemLocale = java.util.Locale.getDefault()
+                    val systemLanguage = systemLocale.language.lowercase()
+                    
+                    when {
+                        systemLanguage == "zh" -> "zh"  // 中文（包括简体、繁体）
+                        systemLanguage == "en" -> "en"  // 英文
+                        else -> "zh"  // 默认使用中文
+                    }
+                }
+                
+                withContext(Dispatchers.Main) {
+                    _selectedLanguage.value = language
+                    // 同步更新LanguageManager
+                    LanguageManager.switchLanguage(getApplication<Application>(), language)
+                }
+            } catch (e: Exception) {
+                Log.e(tag, LanguageManager.getString("log.load_language_settings_failed", e.message ?: ""))
             }
         }
     }

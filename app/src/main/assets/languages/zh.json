@@ -1,0 +1,375 @@
+{
+  "app_name": "自动电话",
+
+  "common": {
+    "settings": "设置",
+    "back": "返回",
+    "confirm": "确定",
+    "cancel": "取消",
+    "close": "关闭",
+    "ok": "好的",
+    "select": "选择"
+  },
+
+  "main_screen": {
+    "title": "自动电话拨打系统",
+    "phone_list": "电话列表 (%d个)",
+    "sort": {
+      "call_count": "按拨打次数",
+      "call_count_asc": "✓ 次数升序",
+      "call_count_desc": "✓ 次数降序",
+      "balance": "按余额",
+      "balance_asc": "✓ 余额升序",
+      "balance_desc": "✓ 余额降序"
+    },
+    "clear_list": "🗑️ 清空",
+    "confirm_clear": {
+      "title": "确认清空",
+      "message": "确定要清空所有联系人吗？此操作不可恢复。",
+      "confirm": "确认清空"
+    }
+  },
+
+  "control_buttons": {
+    "import_phone": "导入电话",
+    "import_clipboard": "导入剪贴板",
+    "start_call": "开始拨打",
+    "pause": "暂停",
+    "resume": "继续",
+    "stop": "停止"
+  },
+
+  "phone_list": {
+    "empty": "暂无电话数据"
+  },
+
+  "phone_item": {
+    "unknown_contact": "未知联系人",
+    "called": "✓ 已拨打 (%d次)",
+    "not_called": "○ 未拨打",
+    "account_number": "户号: %s",
+    "balance": "余额: %s"
+  },
+
+  "status_card": {
+    "title": "当前状态",
+    "progress": "进度: %d / %d"
+  },
+
+  "statistics_card": {
+    "title": "通话统计"
+  },
+
+  "export_button": {
+    "text": "导出联系人列表"
+  },
+
+  "sim_card": {
+    "title": "💳 SIM卡选择",
+    "mode_label": "拨打模式:",
+    "mode_default": "默认卡",
+    "mode_sim1": "SIM卡1",
+    "mode_sim2": "SIM卡2",
+    "mode_alternate": "双卡交替",
+    "option_0": "默认卡 - 使用系统默认SIM卡",
+    "option_1": "SIM卡1 - 强制使用卡槽1",
+    "option_2": "SIM卡2 - 强制使用卡槽2",
+    "option_3": "双卡交替 - 轮流使用两张卡",
+    "selected": "已选择",
+    "status_default": "已设置为默认SIM卡",
+    "status_sim1": "已设置为使用SIM卡1",
+    "status_sim2": "已设置为使用SIM卡2",
+    "status_alternate": "已设置为双卡交替拨打",
+    "using_sim": "使用%s拨打",
+    "modes": {
+      "sim1": "卡1",
+      "sim2": "卡2",
+      "alternate": "双卡交替"
+    }
+  },
+
+  "sim_card_selector": {
+    "title": "SIM卡选择",
+    "current_mode": "当前模式: %s",
+    "hint": "点击选择拨打方式",
+    "dialog_title": "选择SIM卡模式"
+  },
+
+  "audio_selector": {
+    "title": "默认音频选择",
+    "import_button": "导入音频",
+    "audio_0": "余额不足",
+    "audio_1": "停电",
+    "audio_2": "欠费",
+    "custom_audio": "自定义%d",
+    "current_selected": "当前选中: %s",
+    "no_audio": "暂无音频文件",
+    "current": "当前: %s"
+  },
+
+  "about_dialog": {
+    "title": "关于软件",
+    "app_name": "自动电话拨打系统",
+    "developer": "开发者: ZHCOOL520",
+    "links_title": "\n相关链接：",
+    "github_link": "• GitHub: https://github.com/ZHCOOL520/AUTOcall",
+    "bilibili_link": "• Bilibili: https://space.bilibili.com/1414910921"
+  },
+
+  "settings_screen": {
+    "title": "设置",
+    "audio_playback": {
+      "title": "音频播放",
+      "enabled": "✅ 开启：通话时自动播放音频",
+      "disabled": "❌ 关闭：不播放音频"
+    },
+    "call_recording": {
+      "title": "通话录音",
+      "enabled": "✅ 开启：通话时自动录音",
+      "disabled": "❌ 关闭：不录音",
+      "status": "状态: %s"
+    },
+    "call_interval": {
+      "title": "⏱️ 拨打间隔设置",
+      "current": "当前间隔: %s",
+      "description": "两次拨打之间的等待时间，确保通话记录保存完成",
+      "seconds": "%d秒"
+    },
+    "auto_update": {
+      "title": "自动检查更新",
+      "enabled": "✅ 开启",
+      "disabled": "❌ 关闭",
+      "frequency_title": "检查频率:",
+      "daily": "每日",
+      "weekly": "每周",
+      "monthly": "每月"
+    },
+    "version_info": {
+      "title": "版本信息",
+      "current_version": "当前版本: %s",
+      "check_update": "检查更新",
+      "checking": "检查中...",
+      "latest": "已是最新版本",
+      "check_failed": "检查更新失败: %s"
+    },
+    "language": {
+      "title": "🌍 语言设置",
+      "current": "当前语言: %s",
+      "select_description": "选择语言",
+      "dialog_title": "选择语言 / Select Language",
+      "ai_translated": "由 AI 翻译 (AI Translated)",
+      "coming_soon": "其他语言正在适配中 / More languages coming soon"
+    },
+    "network_notice": {
+      "title": "🌐 网络说明",
+      "content": "由于国内网络原因，GitHub可能无法直接访问。\n如果自动更新失败，请使用网络代理工具（魔法）后再试。",
+      "download_button": "前往下载页面"
+    },
+    "feature_intro": {
+      "title": "📖 功能介绍",
+      "features": "• 支持Excel/CSV文件导入联系人\n• 自动拨打电话并播放语音\n• 支持通话录音（需ROOT）\n• 导出通话记录统计\n• 支持剪贴板导入电话号码\n• 支持多SIM卡选择与双卡交替拨打\n• 自动检查更新与后台下载安装",
+      "view_full_button": "查看完整功能介绍"
+    },
+    "privacy_policy": {
+      "title": "⚠️ 隐私政策与免责声明",
+      "items": "• 本软件仅供学习研究使用\n• 严禁用于任何非法用途\n• 使用者需自行承担法律责任",
+      "view_button": "查看完整协议"
+    }
+  },
+
+  "update_dialog": {
+    "title": "发现新版本",
+    "latest_version": "最新版本: %s",
+    "update_content": "\n更新内容:",
+    "downloading": "下载中",
+    "install_now": "后台下载安装",
+    "downloading_progress": "下载中... %d%%",
+    "browser_download": "浏览器下载",
+    "download_failed": "下载失败: %s"
+  },
+
+  "feature_intro_dialog": {
+    "title": "📖 功能介绍",
+    "auto_call": {
+      "title": "📞 自动拨打",
+      "items": "• 支持从Excel/CSV文件批量导入联系人\n• 自动识别户号和余额信息\n• 按顺序自动拨打电话\n• 支持暂停、继续和停止操作"
+    },
+    "audio_playback": {
+      "title": "🔊 音频播放",
+      "items": "• 通话时自动播放预设语音文件\n• 支持自定义导入音频文件\n• 可选择不同场景的语音（余额不足、停电等）\n• 注意：非ROOT设备可能无法让对方听到"
+    },
+    "call_recording": {
+      "title": "🎙️ 通话录音",
+      "items": "• 自动录制通话内容\n• 保存到本地存储\n• 注意：需要ROOT权限才能正常工作"
+    },
+    "sim_card": {
+      "title": "💳 SIM卡管理",
+      "items": "• 支持选择SIM卡1或SIM卡2拨打\n• 双卡交替模式，轮流使用两张卡\n• 智能识别可用SIM卡"
+    },
+    "statistics": {
+      "title": "📊 数据统计",
+      "items": "• 实时统计拨打次数和成功率\n• 支持按拨打次数排序\n• 支持按余额排序\n• 导出CSV格式的通话记录"
+    },
+    "auto_update": {
+      "title": "🔄 自动更新",
+      "items": "• 启动时自动检查最新版本\n• 后台下载APK文件\n• 显示下载进度\n• 下载完成后自动触发安装"
+    }
+  },
+
+  "disclaimer_dialog": {
+    "title": "⚠️ 用户协议与隐私政策",
+    "security_notice": {
+      "title": "🔒 重要声明",
+      "items": "• 本软件仅供学习研究使用，严禁用于任何非法用途\n• 使用者需自行承担全部法律责任\n• 开发者不对任何使用后果负责\n• 请勿骚扰他人或进行恶意拨打"
+    },
+    "function_limitation": {
+      "title": "❗ 功能限制说明",
+      "warning": "⚠️ 由于Android系统安全限制，以下功能可能受限：",
+      "items": "• 通话录音功能在非ROOT设备上可能无法正常工作\n• 音频注入（让对方听到语音）可能被系统阻止\n• 部分Android版本会严格限制应用访问通话音频通道"
+    },
+    "permission_notice": {
+      "title": "📋 权限使用说明",
+      "items": "• CALL_PHONE：用于自动拨打电话功能\n• READ_PHONE_STATE：用于监听通话状态和SIM卡信息\n• RECORD_AUDIO：用于通话录音功能（可选）\n• READ_MEDIA_AUDIO：用于读取和播放音频文件\n• INTERNET：用于检查软件更新\n• REQUEST_INSTALL_PACKAGES：用于安装更新的APK文件"
+    },
+    "privacy_policy": {
+      "title": "🔐 隐私保护",
+      "items": "• 本软件不会收集、上传或分享任何个人信息\n• 所有数据仅存储在本地设备中\n• 联系人信息、通话记录等数据完全由用户控制\n• 软件不包含任何广告或追踪代码"
+    },
+    "data_privacy": {
+      "title": "🛡️ 数据隐私保护",
+      "items": "• 所有数据仅存储在本地设备\n• 不会收集、上传或分享任何用户数据\n• 通话记录、联系人等信息完全由用户掌控\n• 卸载应用后所有数据将自动清除"
+    },
+    "user_responsibility": {
+      "title": "👤 用户责任声明",
+      "items": "• 用户必须遵守当地法律法规使用本软件\n• 禁止将本软件用于骚扰、诈骗等违法行为\n• 如因违规使用导致的法律问题，由用户自行承担\n• 建议仅在合法合规的场景下使用本软件"
+    },
+    "accept_notice": "点击「我同意」表示您已阅读并完全理解以上内容，同意使用本软件",
+    "root_suggestion": "\n💡 建议：如需完整功能，请使用已ROOT的设备或特定品牌手机",
+    "accept_button": "我同意并继续使用",
+    "decline_button": "拒绝"
+  },
+
+  "snackbar": {
+    "language_changed": "语言已切换",
+    "update_check_failed": "检查更新失败: %s"
+  },
+
+  "status": {
+    "ready": "准备就绪",
+    "recording_enabled": "录音已开启（将在下次通话时启动）",
+    "recording_disabled": "录音已关闭",
+    "audio_playback_enabled": "音频播放已开启（将在下次通话时播放）",
+    "audio_playback_disabled": "音频播放已关闭",
+    "call_interval_seconds": "%d秒",
+    "sort_balance_cancelled": "已取消余额排序",
+    "sort_balance_asc": "已按余额从小到大排序",
+    "sort_balance_desc": "已按余额从大到小排序",
+    "sort_call_count_cancelled": "已取消拨打次数排序",
+    "sort_call_count_asc": "已按拨打次数从小到大排序",
+    "sort_call_count_desc": "已按拨打次数从大到小排序",
+    "list_cleared": "列表已清空",
+    "excel_not_found": "Excel文件不存在",
+    "csv_not_found": "CSV文件不存在",
+    "csv_empty": "CSV文件为空",
+    "import_success": "成功导入 %d 个电话",
+    "import_failed": "导入失败: %s",
+    "clipboard_empty": "剪贴板内容为空",
+    "clipboard_no_phone": "未在剪贴板中找到有效电话号码",
+    "clipboard_import_success": "从剪贴板导入 %d 个电话",
+    "clipboard_service_unavailable": "无法获取剪贴板服务",
+    "audio_format_unsupported": "不支持的音频格式",
+    "audio_import_success": "音频导入成功: %s",
+    "audio_import_failed": "导入音频失败: %s",
+    "phone_list_empty": "电话列表为空",
+    "auto_call_started": "开始自动拨打，共 %d 个电话，从第 %d 个开始",
+    "paused_at": "已暂停（当前位置: %d/%d）",
+    "dialing": "正在拨打 %d/%d: %s",
+    "waiting_connect": "等待接通...",
+    "recording_started": "录音已启动",
+    "call_connected_playing": "电话已接通，播放语音...",
+    "call_connected_no_audio": "电话已接通（未播放音频）",
+    "call_ended": "通话结束",
+    "call_not_connected": "未接通，跳过播放",
+    "all_completed": "全部拨打完成",
+    "stopped": "已停止",
+    "resuming": "继续拨打...",
+    "dial_failed": "拨打失败: %s",
+    "no_contacts_to_export": "没有可导出的联系人",
+    "export_success": "导出成功，共 %d 条记录",
+    "export_failed": "导出失败: %s",
+    "statistics": "总计: %d | 成功: %d | 失败: %d | 总时长: %d秒",
+    "unknown": "未知",
+    "file_format_unsupported": "不支持的文件格式",
+    "call_success": "成功",
+    "call_failed": "失败",
+    "update_content_empty": "暂无更新说明",
+    "empty_response": "响应为空",
+    "unknown_error": "未知错误",
+    "download_failed_http": "下载失败: HTTP %d",
+    "empty_response_body": "响应体为空",
+    "csv_header": "姓名,手机号,余额,户号,拨打次数"
+  },
+
+  "log": {
+    "copy_sample_audio_failed": "复制示例音频失败: %s",
+    "import_excel_failed": "导入Excel失败: %s",
+    "import_csv_failed": "导入CSV失败: %s",
+    "import_file_failed": "导入文件失败: %s",
+    "clipboard_import_failed": "从剪贴板导入失败: %s",
+    "invalid_number": "忽略无效号码: '%s' -> 清理后: '%s' (不符合中国大陆手机号格式)",
+    "audio_import_failed": "导入音频失败: %s",
+    "start_dial_index": "开始拨打索引=%d, 号码=%s",
+    "waiting_connect": "等待接通...",
+    "connect_result": "接通结果: connected=%s",
+    "call_connected": "电话已接通，开始通话流程",
+    "recording_started": "录音已启动",
+    "start_playing_audio": "开始播放音频",
+    "disconnect_detected": "通话断开检测完成",
+    "waiting_manual_hangup": "等待手动挂断（无音频播放）",
+    "disconnect_detected_no_audio": "通话断开检测完成（无音频）",
+    "recording_stopped": "录音已停止",
+    "call_flow_end": "通话流程结束",
+    "not_connected_skip": "未接通，跳过后续流程",
+    "mark_index_called": "标记索引=%d 为已拨打",
+    "wait_call_interval": "等待拨打间隔: %d秒",
+    "index_completed": "索引=%d 处理完成，准备下一个",
+    "stop_auto_call": "停止自动拨打",
+    "pause_auto_call": "暂停自动拨打，当前索引=%d",
+    "resume_auto_call": "恢复自动拨打，从索引=%d继续",
+    "state_monitor": "状态监听: state=%s, expectedIndex=%d, currentProcessingIndex=%d",
+    "index_mismatch_skip": "索引不匹配，忽略状态: current=%d, expected=%d",
+    "disconnect_event_detected": "检测到断开事件",
+    "confirmed_disconnect": "确认通话已彻底断开",
+    "cannot_get_audio_manager": "无法获取AudioManager服务",
+    "state_changed_or_mismatch": "状态已变化或索引不匹配，取消断开处理",
+    "reconnect_detected": "检测到重新连接，说明还在通话中",
+    "missing_read_phone_state": "缺少READ_PHONE_STATE权限，使用默认拨号",
+    "permission_insufficient": "权限不足: %s",
+    "get_subscription_info_failed": "获取SubscriptionInfo失败: %s",
+    "export_failed": "导出失败: %s",
+    "save_data_failed": "保存数据失败: %s",
+    "load_data_failed": "加载数据失败: %s",
+    "load_update_settings_failed": "加载更新设置失败: %s",
+    "load_language_settings_failed": "加载语言设置失败: %s",
+    "auto_update_check_failed": "自动检查更新失败: %s",
+    "number": "号码",
+    "call_ended": "通话结束",
+    "incoming_number": "来电号码",
+    "listener_registered": "监听已注册",
+    "listener_unregistered": "监听已注销",
+    "channel_closed": "Channel已关闭",
+    "already_injecting": "已在注入中，忽略重复请求",
+    "file_not_exist": "文件不存在: %s",
+    "cannot_get_audio_manager_skip_restore": "无法获取AudioManager服务，跳过恢复",
+    "mediaplayer_prepared": "MediaPlayer 已准备，开始播放",
+    "playback_completed": "播放正常完成",
+    "mediaplayer_error": "MediaPlayer 错误: what=%d, extra=%d",
+    "coroutine_cancelled": "协程被取消",
+    "inject_exception": "注入异常: %s",
+    "resume_continuation_failed": "恢复 continuation 失败: %s",
+    "restore_audio_state_failed": "恢复音频状态失败: %s",
+    "release_mediaplayer_failed": "释放 MediaPlayer 失败: %s",
+    "start_recording_failed": "启动录音失败: %s",
+    "stop_recording_failed": "停止录音失败: %s"
+  }
+}

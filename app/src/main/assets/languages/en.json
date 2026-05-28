@@ -1,0 +1,375 @@
+{
+  "app_name": "AUTOcall",
+
+  "common": {
+    "settings": "Settings",
+    "back": "Back",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "close": "Close",
+    "ok": "OK",
+    "select": "Select"
+  },
+
+  "main_screen": {
+    "title": "Auto Phone Dialing System",
+    "phone_list": "Phone List (%d)",
+    "sort": {
+      "call_count": "By Call Count",
+      "call_count_asc": "✓ Count Ascending",
+      "call_count_desc": "✓ Count Descending",
+      "balance": "By Balance",
+      "balance_asc": "✓ Balance Ascending",
+      "balance_desc": "✓ Balance Descending"
+    },
+    "clear_list": "🗑️ Clear",
+    "confirm_clear": {
+      "title": "Confirm Clear",
+      "message": "Are you sure you want to clear all contacts? This action cannot be undone.",
+      "confirm": "Confirm Clear"
+    }
+  },
+
+  "control_buttons": {
+    "import_phone": "Import Phone",
+    "import_clipboard": "Import Clipboard",
+    "start_call": "Start Calling",
+    "pause": "Pause",
+    "resume": "Resume",
+    "stop": "Stop"
+  },
+
+  "phone_list": {
+    "empty": "No phone data available"
+  },
+
+  "phone_item": {
+    "unknown_contact": "Unknown Contact",
+    "called": "✓ Called (%d times)",
+    "not_called": "○ Not Called",
+    "account_number": "Account: %s",
+    "balance": "Balance: %s"
+  },
+
+  "status_card": {
+    "title": "Current Status",
+    "progress": "Progress: %d / %d"
+  },
+
+  "statistics_card": {
+    "title": "Call Statistics"
+  },
+
+  "export_button": {
+    "text": "Export Contact List"
+  },
+
+  "sim_card": {
+    "title": "💳 SIM Card Selection",
+    "mode_label": "Dial Mode:",
+    "mode_default": "Default SIM",
+    "mode_sim1": "SIM Card 1",
+    "mode_sim2": "SIM Card 2",
+    "mode_alternate": "Dual-SIM Alternate",
+    "option_0": "Default SIM - Use system default SIM card",
+    "option_1": "SIM Card 1 - Force use slot 1",
+    "option_2": "SIM Card 2 - Force use slot 2",
+    "option_3": "Dual-SIM Alternate - Alternate between two cards",
+    "selected": "Selected",
+    "status_default": "Set to default SIM card",
+    "status_sim1": "Set to use SIM Card 1",
+    "status_sim2": "Set to use SIM Card 2",
+    "status_alternate": "Set to dual-SIM alternate mode",
+    "using_sim": "Using %s for dialing",
+    "modes": {
+      "sim1": "SIM 1",
+      "sim2": "SIM 2",
+      "alternate": "Dual-SIM Alternate"
+    }
+  },
+
+  "sim_card_selector": {
+    "title": "SIM Card Selection",
+    "current_mode": "Current mode: %s",
+    "hint": "Click to select dialing method",
+    "dialog_title": "Select SIM Card Mode"
+  },
+
+  "audio_selector": {
+    "title": "Default Audio Selection",
+    "import_button": "Import Audio",
+    "audio_0": "Insufficient Balance",
+    "audio_1": "Power Outage",
+    "audio_2": "Arrears",
+    "custom_audio": "Custom %d",
+    "current_selected": "Currently selected: %s",
+    "no_audio": "No audio files available",
+    "current": "Current: %s"
+  },
+
+  "about_dialog": {
+    "title": "About Software",
+    "app_name": "Auto Phone Dialing System",
+    "developer": "Developer: ZHCOOL520",
+    "links_title": "\nRelated Links:",
+    "github_link": "• GitHub: https://github.com/ZHCOOL520/AUTOcall",
+    "bilibili_link": "• Bilibili: https://space.bilibili.com/1414910921"
+  },
+
+  "settings_screen": {
+    "title": "Settings",
+    "audio_playback": {
+      "title": "Audio Playback",
+      "enabled": "✅ Enabled: Auto play audio during calls",
+      "disabled": "❌ Disabled: No audio playback"
+    },
+    "call_recording": {
+      "title": "Call Recording",
+      "enabled": "✅ Enabled: Auto record calls",
+      "disabled": "❌ Disabled: No recording",
+      "status": "Status: %s"
+    },
+    "call_interval": {
+      "title": "⏱️ Call Interval Settings",
+      "current": "Current interval: %s",
+      "description": "Waiting time between calls to ensure call records are saved",
+      "seconds": "%ds"
+    },
+    "auto_update": {
+      "title": "Auto Check for Updates",
+      "enabled": "✅ Enabled",
+      "disabled": "❌ Disabled",
+      "frequency_title": "Check Frequency:",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly"
+    },
+    "version_info": {
+      "title": "Version Info",
+      "current_version": "Current version: %s",
+      "check_update": "Check for Updates",
+      "checking": "Checking...",
+      "latest": "Already latest version",
+      "check_failed": "Update check failed: %s"
+    },
+    "language": {
+      "title": "🌍 Language Settings",
+      "current": "Current language: %s",
+      "select_description": "Select language",
+      "dialog_title": "Select Language / 选择语言",
+      "ai_translated": "AI Translated (由 AI 翻译)",
+      "coming_soon": "More languages coming soon / 其他语言正在适配中"
+    },
+    "network_notice": {
+      "title": "🌐 Network Notice",
+      "content": "Due to network restrictions in mainland China, GitHub may not be directly accessible.\nIf automatic update fails, please use a VPN or proxy tool.",
+      "download_button": "Go to Download Page"
+    },
+    "feature_intro": {
+      "title": "📖 Feature Introduction",
+      "features": "• Support Excel/CSV file import for contacts\n• Auto dial and play voice messages\n• Support call recording (requires ROOT)\n• Export call record statistics\n• Support clipboard import for phone numbers\n• Support multiple SIM card selection and dual-SIM alternation\n• Auto check for updates and background download",
+      "view_full_button": "View Full Feature Introduction"
+    },
+    "privacy_policy": {
+      "title": "⚠️ Privacy Policy & Disclaimer",
+      "items": "• This software is for learning and research purposes only\n• Strictly prohibited for any illegal purposes\n• Users must bear legal responsibilities themselves",
+      "view_button": "View Full Agreement"
+    }
+  },
+
+  "update_dialog": {
+    "title": "New Version Available",
+    "latest_version": "Latest version: %s",
+    "update_content": "\nUpdate content:",
+    "downloading": "Downloading",
+    "install_now": "Download & Install in Background",
+    "downloading_progress": "Downloading... %d%%",
+    "browser_download": "Download via Browser",
+    "download_failed": "Download failed: %s"
+  },
+
+  "feature_intro_dialog": {
+    "title": "📖 Feature Introduction",
+    "auto_call": {
+      "title": "📞 Auto Dial",
+      "items": "• Support batch import contacts from Excel/CSV files\n• Auto recognize account numbers and balance information\n• Auto dial phone numbers in sequence\n• Support pause, resume and stop operations"
+    },
+    "audio_playback": {
+      "title": "🔊 Audio Playback",
+      "items": "• Auto play preset voice files during calls\n• Support custom import of audio files\n• Select voice messages for different scenarios (insufficient balance, power outage, etc.)\n• Note: Non-ROOT devices may not allow the other party to hear"
+    },
+    "call_recording": {
+      "title": "🎙️ Call Recording",
+      "items": "• Auto record call content\n• Save to local storage\n• Note: Requires ROOT permission to work properly"
+    },
+    "sim_card": {
+      "title": "💳 SIM Card Management",
+      "items": "• Support selecting SIM card 1 or SIM card 2 for dialing\n• Dual-SIM alternate mode, alternate between two cards\n• Smart recognition of available SIM cards"
+    },
+    "statistics": {
+      "title": "📊 Data Statistics",
+      "items": "• Real-time statistics of call count and success rate\n• Support sorting by call count\n• Support sorting by balance\n• Export call records in CSV format"
+    },
+    "auto_update": {
+      "title": "🔄 Auto Update",
+      "items": "• Auto check for latest version on startup\n• Download APK files in background\n• Display download progress\n• Auto trigger installation after download completes"
+    }
+  },
+
+  "disclaimer_dialog": {
+    "title": "⚠️ User Agreement & Privacy Policy",
+    "security_notice": {
+      "title": "🔒 Important Notice",
+      "items": "• This software is for learning and research purposes only, strictly prohibited for any illegal purposes\n• Users must bear all legal responsibilities\n• Developers are not responsible for any consequences\n• Do not harass others or make malicious calls"
+    },
+    "function_limitation": {
+      "title": "❗ Function Limitation Notice",
+      "warning": "⚠️ Due to Android system security restrictions, the following functions may be limited:",
+      "items": "• Call recording function may not work properly on non-ROOT devices\n• Audio injection (letting the other party hear voice) may be blocked by the system\n• Some Android versions strictly restrict app access to call audio channels"
+    },
+    "permission_notice": {
+      "title": "📋 Permission Usage Notice",
+      "items": "• CALL_PHONE: For auto dialing function\n• READ_PHONE_STATE: For monitoring call status and SIM card information\n• RECORD_AUDIO: For call recording function (optional)\n• READ_MEDIA_AUDIO: For reading and playing audio files\n• INTERNET: For checking software updates\n• REQUEST_INSTALL_PACKAGES: For installing updated APK files"
+    },
+    "privacy_policy": {
+      "title": "🔐 Privacy Protection",
+      "items": "• This software will not collect, upload or share any personal information\n• All data is stored only on local devices\n• Contact information, call records and other data are fully controlled by users\n• The software does not contain any advertisements or tracking code"
+    },
+    "data_privacy": {
+      "title": "🛡️ Data Privacy Protection",
+      "items": "• All data is stored only on the local device\n• No user data will be collected, uploaded or shared\n• Call records, contacts and other information are fully controlled by users\n• All data will be automatically cleared after uninstalling the app"
+    },
+    "user_responsibility": {
+      "title": "👤 User Responsibility Statement",
+      "items": "• Users must comply with local laws and regulations when using this software\n• It is prohibited to use this software for harassment, fraud and other illegal activities\n• If legal problems arise due to non-compliant use, users shall bear the responsibility themselves\n• It is recommended to use this software only in legal and compliant scenarios"
+    },
+    "accept_notice": "By clicking \"I Agree\", you confirm that you have read and fully understood the above content and agree to use this software",
+    "root_suggestion": "\n💡 Suggestion: For full functionality, please use a ROOTED device or specific brand phone",
+    "accept_button": "I Agree and Continue",
+    "decline_button": "Decline"
+  },
+
+  "snackbar": {
+    "language_changed": "Language switched",
+    "update_check_failed": "Update check failed: %s"
+  },
+
+  "status": {
+    "ready": "Ready",
+    "recording_enabled": "Recording enabled (will start on next call)",
+    "recording_disabled": "Recording disabled",
+    "audio_playback_enabled": "Audio playback enabled (will play on next call)",
+    "audio_playback_disabled": "Audio playback disabled",
+    "call_interval_seconds": "%ds",
+    "sort_balance_cancelled": "Balance sorting cancelled",
+    "sort_balance_asc": "Sorted by balance (ascending)",
+    "sort_balance_desc": "Sorted by balance (descending)",
+    "sort_call_count_cancelled": "Call count sorting cancelled",
+    "sort_call_count_asc": "Sorted by call count (ascending)",
+    "sort_call_count_desc": "Sorted by call count (descending)",
+    "list_cleared": "List cleared",
+    "excel_not_found": "Excel file not found",
+    "csv_not_found": "CSV file not found",
+    "csv_empty": "CSV file is empty",
+    "import_success": "Successfully imported %d phone numbers",
+    "import_failed": "Import failed: %s",
+    "clipboard_empty": "Clipboard is empty",
+    "clipboard_no_phone": "No valid phone numbers found in clipboard",
+    "clipboard_import_success": "Imported %d phone numbers from clipboard",
+    "clipboard_service_unavailable": "Clipboard service unavailable",
+    "audio_format_unsupported": "Unsupported audio format",
+    "audio_import_success": "Audio imported successfully: %s",
+    "audio_import_failed": "Audio import failed: %s",
+    "phone_list_empty": "Phone list is empty",
+    "auto_call_started": "Auto dial started: %d numbers, starting from #%d",
+    "paused_at": "Paused (position: %d/%d)",
+    "dialing": "Dialing %d/%d: %s",
+    "waiting_connect": "Waiting for connection...",
+    "recording_started": "Recording started",
+    "call_connected_playing": "Call connected, playing audio...",
+    "call_connected_no_audio": "Call connected (no audio playback)",
+    "call_ended": "Call ended",
+    "call_not_connected": "Not connected, skipping playback",
+    "all_completed": "All calls completed",
+    "stopped": "Stopped",
+    "resuming": "Resuming...",
+    "dial_failed": "Dial failed: %s",
+    "no_contacts_to_export": "No contacts to export",
+    "export_success": "Export successful, %d records",
+    "export_failed": "Export failed: %s",
+    "statistics": "Total: %d | Success: %d | Failed: %d | Duration: %ds",
+    "unknown": "Unknown",
+    "file_format_unsupported": "Unsupported file format",
+    "call_success": "Success",
+    "call_failed": "Failed",
+    "update_content_empty": "No update description available",
+    "empty_response": "Empty response",
+    "unknown_error": "Unknown error",
+    "download_failed_http": "Download failed: HTTP %d",
+    "empty_response_body": "Response body is empty",
+    "csv_header": "Name,Phone,Balance,Account Number,Call Count"
+  },
+
+  "log": {
+    "copy_sample_audio_failed": "Failed to copy sample audio: %s",
+    "import_excel_failed": "Failed to import Excel: %s",
+    "import_csv_failed": "Failed to import CSV: %s",
+    "import_file_failed": "Failed to import file: %s",
+    "clipboard_import_failed": "Failed to import from clipboard: %s",
+    "invalid_number": "Ignored invalid number: '%s' -> cleaned: '%s' (does not match China mobile format)",
+    "audio_import_failed": "Failed to import audio: %s",
+    "start_dial_index": "Starting dial index=%d, number=%s",
+    "waiting_connect": "Waiting for connection...",
+    "connect_result": "Connection result: connected=%s",
+    "call_connected": "Call connected, starting call flow",
+    "recording_started": "Recording started",
+    "start_playing_audio": "Starting audio playback",
+    "disconnect_detected": "Disconnect detection completed",
+    "waiting_manual_hangup": "Waiting for manual hangup (no audio playback)",
+    "disconnect_detected_no_audio": "Disconnect detection completed (no audio)",
+    "recording_stopped": "Recording stopped",
+    "call_flow_end": "Call flow ended",
+    "not_connected_skip": "Not connected, skipping subsequent flow",
+    "mark_index_called": "Marked index=%d as called",
+    "wait_call_interval": "Waiting call interval: %ds",
+    "index_completed": "Index=%d completed, preparing next",
+    "stop_auto_call": "Stopping auto call",
+    "pause_auto_call": "Pausing auto call, current index=%d",
+    "resume_auto_call": "Resuming auto call, continuing from index=%d",
+    "state_monitor": "State monitor: state=%s, expectedIndex=%d, currentProcessingIndex=%d",
+    "index_mismatch_skip": "Index mismatch, skipping state: current=%d, expected=%d",
+    "disconnect_event_detected": "Disconnect event detected",
+    "confirmed_disconnect": "Confirmed call fully disconnected",
+    "cannot_get_audio_manager": "Cannot get AudioManager service",
+    "state_changed_or_mismatch": "State changed or index mismatch, canceling disconnect handling",
+    "reconnect_detected": "Reconnect detected, call still in progress",
+    "missing_read_phone_state": "Missing READ_PHONE_STATE permission, using default dialing",
+    "permission_insufficient": "Insufficient permission: %s",
+    "get_subscription_info_failed": "Failed to get SubscriptionInfo: %s",
+    "export_failed": "Export failed: %s",
+    "save_data_failed": "Failed to save data: %s",
+    "load_data_failed": "Failed to load data: %s",
+    "load_update_settings_failed": "Failed to load update settings: %s",
+    "load_language_settings_failed": "Failed to load language settings: %s",
+    "auto_update_check_failed": "Auto update check failed: %s",
+    "number": "Number",
+    "call_ended": "Call ended",
+    "incoming_number": "Incoming number",
+    "listener_registered": "Listener registered",
+    "listener_unregistered": "Listener unregistered",
+    "channel_closed": "Channel closed",
+    "already_injecting": "Already injecting, ignoring duplicate request",
+    "file_not_exist": "File does not exist: %s",
+    "cannot_get_audio_manager_skip_restore": "Cannot get AudioManager service, skipping restore",
+    "mediaplayer_prepared": "MediaPlayer prepared, starting playback",
+    "playback_completed": "Playback completed normally",
+    "mediaplayer_error": "MediaPlayer error: what=%d, extra=%d",
+    "coroutine_cancelled": "Coroutine cancelled",
+    "inject_exception": "Injection exception: %s",
+    "resume_continuation_failed": "Failed to resume continuation: %s",
+    "restore_audio_state_failed": "Failed to restore audio state: %s",
+    "release_mediaplayer_failed": "Failed to release MediaPlayer: %s",
+    "start_recording_failed": "Failed to start recording: %s",
+    "stop_recording_failed": "Failed to stop recording: %s"
+  }
+}

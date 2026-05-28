@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -96,7 +97,7 @@ class MainActivity : ComponentActivity() {
     private fun importFromClipboard() {
         val clipboard = getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager
         if (clipboard == null) {
-            viewModel.updateStatus("无法获取剪贴板服务")
+            viewModel.updateStatus(LanguageManager.getString("status.clipboard_service_unavailable"))
             return
         }
         if (clipboard.hasPrimaryClip()) {
@@ -106,11 +107,11 @@ class MainActivity : ComponentActivity() {
                 if (!text.isNullOrEmpty()) {
                     viewModel.importFromClipboard(this, text)
                 } else {
-                    viewModel.updateStatus("剪贴板内容为空")
+                    viewModel.updateStatus(LanguageManager.getString("status.clipboard_empty"))
                 }
             }
         } else {
-            viewModel.updateStatus("剪贴板无内容")
+            viewModel.updateStatus(LanguageManager.getString("status.clipboard_empty"))
         }
     }
 
@@ -118,6 +119,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         checkAndRequestPermissions()
+        
+        // 注意：不在这里初始化LanguageManager，等待ViewModel加载设置后自动初始化
+        // LanguageManager会在loadLanguageSettings()中被正确初始化
 
         setContent {
             AUTOCallTheme {
@@ -152,7 +156,11 @@ class MainActivity : ComponentActivity() {
                             SettingsScreen(
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
-                                onImportAudio = { importAudioLauncher.launch("audio/*") }
+                                onImportAudio = { importAudioLauncher.launch("audio/*") },
+                                onDeclineDisclaimer = {
+                                    declineDisclaimer()
+                                    finish()
+                                }
                             )
                         }
                     }
@@ -170,6 +178,12 @@ class MainActivity : ComponentActivity() {
     private fun acceptDisclaimer() {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         prefs.edit().putBoolean("disclaimer_accepted", true).apply()
+    }
+
+    @SuppressLint("UseKtx")
+    private fun declineDisclaimer() {
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        prefs.edit().putBoolean("disclaimer_accepted", false).apply()
     }
 
     private fun checkAndRequestPermissions() {
@@ -203,11 +217,11 @@ class MainActivity : ComponentActivity() {
                 fileName.endsWith(".csv", true) -> viewModel.importFromCSV(this, file.absolutePath)
                 fileName.endsWith(".xlsx", true) || fileName.endsWith(".xls", true) ->
                     viewModel.importFromExcel(this, file.absolutePath)
-                else -> viewModel.updateStatus("不支持的文件格式")
+                else -> viewModel.updateStatus(LanguageManager.getString("status.file_format_unsupported"))
             }
         } catch (e: Exception) {
-            Log.e("MainActivity", "导入文件失败: ${e.message}", e)
-            viewModel.updateStatus("导入失败: ${e.message}")
+            Log.e("MainActivity", LanguageManager.getString("log.import_file_failed", e.message ?: ""), e)
+            viewModel.updateStatus(LanguageManager.getString("status.import_failed", e.message ?: ""))
         }
     }
 
@@ -238,6 +252,8 @@ fun MainScreen(
     val sortByBalance by viewModel.sortByBalance.collectAsState()
     val sortByCallCount by viewModel.sortByCallCount.collectAsState()
     val isPaused by viewModel.isPaused.collectAsState()
+    // 关键修复：监听语言状态变化，触发UI重组
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
@@ -266,13 +282,13 @@ fun MainScreen(
             TopAppBar(
                 title = { 
                     Text(
-                        "自动电话拨打系统",
+                        LanguageManager.getString("main_screen.title"),
                         modifier = Modifier.clickable { showAboutDialog = true }
                     ) 
                 },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "设置")
+                        Icon(Icons.Default.Settings, contentDescription = LanguageManager.getString("common.settings"))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -308,7 +324,7 @@ fun MainScreen(
                 )
 
                 Text(
-                    text = "电话列表 (${phoneList.size}个)",
+                    text = LanguageManager.getString("main_screen.phone_list", phoneList.size),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -320,10 +336,10 @@ fun MainScreen(
                 ) {
                     // 拨打次数排序按钮
                     val callCountSortText = when (sortByCallCount) {
-                        0 -> "按拨打次数"
-                        1 -> "✓ 次数升序"
-                        2 -> "✓ 次数降序"
-                        else -> "按拨打次数"
+                        0 -> LanguageManager.getString("main_screen.sort.call_count")
+                        1 -> LanguageManager.getString("main_screen.sort.call_count_asc")
+                        2 -> LanguageManager.getString("main_screen.sort.call_count_desc")
+                        else -> LanguageManager.getString("main_screen.sort.call_count")
                     }
                     FilterChip(
                         selected = sortByCallCount != 0,
@@ -335,10 +351,10 @@ fun MainScreen(
                     // 余额排序按钮
                     if (phoneList.any { !it.balance.isNullOrEmpty() }) {
                         val sortText = when (sortByBalance) {
-                            0 -> "按余额"
-                            1 -> "✓ 余额升序"
-                            2 -> "✓ 余额降序"
-                            else -> "按余额"
+                            0 -> LanguageManager.getString("main_screen.sort.balance")
+                            1 -> LanguageManager.getString("main_screen.sort.balance_asc")
+                            2 -> LanguageManager.getString("main_screen.sort.balance_desc")
+                            else -> LanguageManager.getString("main_screen.sort.balance")
                         }
                         FilterChip(
                             selected = sortByBalance != 0,
@@ -355,7 +371,7 @@ fun MainScreen(
                         FilterChip(
                             selected = false,
                             onClick = { showClearDialog = true },
-                            label = { Text("🗑️ 清空", style = MaterialTheme.typography.bodySmall) },
+                            label = { Text(LanguageManager.getString("main_screen.clear_list"), style = MaterialTheme.typography.bodySmall) },
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
                             ),
@@ -365,8 +381,8 @@ fun MainScreen(
                         if (showClearDialog) {
                             AlertDialog(
                                 onDismissRequest = { showClearDialog = false },
-                                title = { Text("确认清空") },
-                                text = { Text("确定要清空所有联系人吗？此操作不可恢复。") },
+                                title = { Text(LanguageManager.getString("main_screen.confirm_clear.title")) },
+                                text = { Text(LanguageManager.getString("main_screen.confirm_clear.message")) },
                                 confirmButton = {
                                     Button(
                                         onClick = {
@@ -377,12 +393,12 @@ fun MainScreen(
                                             containerColor = MaterialTheme.colorScheme.error
                                         )
                                     ) {
-                                        Text("确认清空")
+                                        Text(LanguageManager.getString("main_screen.confirm_clear.confirm"))
                                     }
                                 },
                                 dismissButton = {
                                     TextButton(onClick = { showClearDialog = false }) {
-                                        Text("取消")
+                                        Text(LanguageManager.getString("common.cancel"))
                                     }
                                 }
                             )
@@ -435,11 +451,11 @@ fun MainScreen(
         
         AlertDialog(
             onDismissRequest = { if (!isDownloading) showUpdateDialog = false },
-            title = { Text("发现新版本") },
+            title = { Text(LanguageManager.getString("update_dialog.title")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("最新版本: ${updateInfo!!.first}", fontWeight = FontWeight.Bold)
-                    Text("\n更新内容:", fontWeight = FontWeight.Bold)
+                    Text(LanguageManager.getString("update_dialog.latest_version", updateInfo!!.first), fontWeight = FontWeight.Bold)
+                    Text(LanguageManager.getString("update_dialog.update_content"), fontWeight = FontWeight.Bold)
                     Text(updateInfo!!.second)
                     
                     if (isDownloading) {
@@ -449,7 +465,7 @@ fun MainScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Text(
-                                "下载中... ${(downloadProgress * 100).toInt()}%",
+                                LanguageManager.getString("update_dialog.downloading_progress", (downloadProgress * 100).toInt()),
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
@@ -485,7 +501,7 @@ fun MainScreen(
                             strokeWidth = 2.dp
                         )
                     }
-                    Text(if (isDownloading) "下载中" else "后台下载安装")
+                    Text(if (isDownloading) LanguageManager.getString("update_dialog.downloading") else LanguageManager.getString("update_dialog.install_now"))
                 }
             },
             dismissButton = {
@@ -498,7 +514,7 @@ fun MainScreen(
                     },
                     enabled = !isDownloading
                 ) {
-                    Text("浏览器下载")
+                    Text(LanguageManager.getString("update_dialog.browser_download"))
                 }
             }
         )
@@ -512,15 +528,15 @@ fun AboutSoftwareDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("关于软件") },
+        title = { Text(LanguageManager.getString("about_dialog.title")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("自动电话拨打系统", fontWeight = FontWeight.Bold)
-                Text("开发者: ZHCOOL520")
+                Text(LanguageManager.getString("about_dialog.app_name"), fontWeight = FontWeight.Bold)
+                Text(LanguageManager.getString("about_dialog.developer"))
                 
-                Text("\n相关链接：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                Text(LanguageManager.getString("about_dialog.links_title"), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
                 Text(
-                    text = "• GitHub: https://github.com/ZHCOOL520/AUTOcall",
+                    text = LanguageManager.getString("about_dialog.github_link"),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ZHCOOL520/AUTOcall"))
@@ -529,7 +545,7 @@ fun AboutSoftwareDialog(
                     }
                 )
                 Text(
-                    text = "• Bilibili: https://space.bilibili.com/1414910921",
+                    text = LanguageManager.getString("about_dialog.bilibili_link"),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://space.bilibili.com/1414910921?spm_id_from=333.1007.0.0"))
@@ -540,7 +556,7 @@ fun AboutSoftwareDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss) { Text("确定") }
+            Button(onClick = onDismiss) { Text(LanguageManager.getString("common.confirm")) }
         }
     )
 }
@@ -551,7 +567,8 @@ fun AboutSoftwareDialog(
 fun SettingsScreen(
     viewModel: AutoCallViewModel,
     onBack: () -> Unit,
-    onImportAudio: () -> Unit
+    onImportAudio: () -> Unit,
+    onDeclineDisclaimer: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val currentStatus by viewModel.currentStatus.collectAsState()
@@ -562,12 +579,14 @@ fun SettingsScreen(
     val autoCheckUpdateEnabled by viewModel.autoCheckUpdateEnabled.collectAsState()
     val checkUpdateInterval by viewModel.checkUpdateInterval.collectAsState()
     val callInterval by viewModel.callInterval.collectAsState()
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var updateInfo by remember { mutableStateOf<Triple<String, String, String>?>(null) } // (version, content, url)
     var showFeatureIntro by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     // 启动时检查更新
     LaunchedEffect(Unit) {
@@ -582,10 +601,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置") },
+                title = { Text(LanguageManager.getString("settings_screen.title")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = LanguageManager.getString("common.back"))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -618,9 +637,9 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("音频播放", fontWeight = FontWeight.Bold)
+                        Text(LanguageManager.getString("settings_screen.audio_playback.title"), fontWeight = FontWeight.Bold)
                         Text(
-                            if (isAudioPlaybackEnabled) "✅ 开启：通话时自动播放音频" else "❌ 关闭：不播放音频",
+                            if (isAudioPlaybackEnabled) LanguageManager.getString("settings_screen.audio_playback.enabled") else LanguageManager.getString("settings_screen.audio_playback.disabled"),
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -654,14 +673,14 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("通话录音", fontWeight = FontWeight.Bold)
+                        Text(LanguageManager.getString("settings_screen.call_recording.title"), fontWeight = FontWeight.Bold)
                         Text(
-                            if (isRecordingEnabled) "✅ 开启：通话时自动录音" else "❌ 关闭：不录音",
+                            if (isRecordingEnabled) LanguageManager.getString("settings_screen.call_recording.enabled") else LanguageManager.getString("settings_screen.call_recording.disabled"),
                             style = MaterialTheme.typography.bodySmall
                         )
-                        if (currentStatus.contains("录音", ignoreCase = true)) {
+                        if (isRecordingEnabled) {
                             Text(
-                                "状态: $currentStatus",
+                                LanguageManager.getString("settings_screen.call_recording.status", currentStatus),
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary)
                             )
                         }
@@ -687,14 +706,14 @@ fun SettingsScreen(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("⏱️ 拨打间隔设置", fontWeight = FontWeight.Bold)
+                    Text(LanguageManager.getString("settings_screen.call_interval.title"), fontWeight = FontWeight.Bold)
                     Text(
-                        "当前间隔: ${viewModel.getCallIntervalText()}",
+                        LanguageManager.getString("settings_screen.call_interval.current", viewModel.getCallIntervalText()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        "两次拨打之间的等待时间，确保通话记录保存完成",
+                        LanguageManager.getString("settings_screen.call_interval.description"),
                         style = MaterialTheme.typography.bodySmall
                     )
                     
@@ -706,7 +725,7 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = (callInterval / 1000L).toInt() == seconds,
                                 onClick = { viewModel.setCallInterval(seconds) },
-                                label = { Text("${seconds}秒") },
+                                label = { Text(LanguageManager.getString("settings_screen.call_interval.seconds", seconds)) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -730,9 +749,9 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("自动检查更新", fontWeight = FontWeight.Bold)
+                            Text(LanguageManager.getString("settings_screen.auto_update.title"), fontWeight = FontWeight.Bold)
                             Text(
-                                if (autoCheckUpdateEnabled) "✅ 开启" else "❌ 关闭",
+                                if (autoCheckUpdateEnabled) LanguageManager.getString("settings_screen.auto_update.enabled") else LanguageManager.getString("settings_screen.auto_update.disabled"),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -743,15 +762,15 @@ fun SettingsScreen(
                     }
                     
                     if (autoCheckUpdateEnabled) {
-                        Text("检查频率:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text(LanguageManager.getString("settings_screen.auto_update.frequency_title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             listOf(
-                                0 to "每日",
-                                1 to "每周",
-                                2 to "每月"
+                                0 to LanguageManager.getString("settings_screen.auto_update.daily"),
+                                1 to LanguageManager.getString("settings_screen.auto_update.weekly"),
+                                2 to LanguageManager.getString("settings_screen.auto_update.monthly")
                             ).forEach { (value, label) ->
                                 FilterChip(
                                     selected = checkUpdateInterval == value,
@@ -779,8 +798,8 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("版本信息", fontWeight = FontWeight.Bold)
-                            Text("当前版本: ${getAppVersion(context)}", style = MaterialTheme.typography.bodySmall)
+                            Text(LanguageManager.getString("settings_screen.version_info.title"), fontWeight = FontWeight.Bold)
+                            Text(LanguageManager.getString("settings_screen.version_info.current_version", getAppVersion(context)), style = MaterialTheme.typography.bodySmall)
                         }
                         Button(
                             onClick = {
@@ -803,7 +822,7 @@ fun SettingsScreen(
                                             if (responseBody != null) {
                                                 val json = JSONObject(responseBody)
                                                 val version = json.getString("tag_name")
-                                                val content = json.optString("body", "暂无更新说明")
+                                                val content = json.optString("body", LanguageManager.getString("status.update_content_empty"))
                                                 val htmlUrl = json.getString("html_url")
                                                 
                                                 withContext(Dispatchers.Main) {
@@ -815,7 +834,7 @@ fun SettingsScreen(
                                                         showUpdateDialog = true
                                                     } else {
                                                         snackbarHostState.showSnackbar(
-                                                            "已是最新版本",
+                                                            LanguageManager.getString("settings_screen.version_info.latest"),
                                                             duration = SnackbarDuration.Short
                                                         )
                                                     }
@@ -824,7 +843,7 @@ fun SettingsScreen(
                                                 withContext(Dispatchers.Main) {
                                                     isCheckingUpdate = false
                                                     snackbarHostState.showSnackbar(
-                                                        "检查更新失败: 响应为空",
+                                                        LanguageManager.getString("settings_screen.version_info.check_failed", LanguageManager.getString("status.empty_response")),
                                                         duration = SnackbarDuration.Long
                                                     )
                                                 }
@@ -834,7 +853,7 @@ fun SettingsScreen(
                                         withContext(Dispatchers.Main) {
                                             isCheckingUpdate = false
                                             snackbarHostState.showSnackbar(
-                                                "检查更新失败: ${e.message}",
+                                                LanguageManager.getString("settings_screen.version_info.check_failed", e.message ?: LanguageManager.getString("status.unknown_error")),
                                                 duration = SnackbarDuration.Long
                                             )
                                         }
@@ -849,10 +868,40 @@ fun SettingsScreen(
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Text("检查更新")
+                                Text(LanguageManager.getString("settings_screen.version_info.check_update"))
                             }
                         }
                     }
+                }
+            }
+
+            // 语言切换设置
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showLanguageDialog = true },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(LanguageManager.getString("settings_screen.language.title"), fontWeight = FontWeight.Bold)
+                        Text(
+                            LanguageManager.getString("settings_screen.language.current", viewModel.getLanguageText()),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = LanguageManager.getString("settings_screen.language.select_description"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -864,10 +913,9 @@ fun SettingsScreen(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("🌐 网络说明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    Text(LanguageManager.getString("settings_screen.network_notice.title"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
                     Text(
-                        "由于国内网络原因，GitHub可能无法直接访问。\n" +
-                        "如果自动更新失败，请使用网络代理工具（魔法）后再试。",
+                        LanguageManager.getString("settings_screen.network_notice.content"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
                     )
@@ -880,7 +928,7 @@ fun SettingsScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("前往下载页面")
+                        Text(LanguageManager.getString("settings_screen.network_notice.download_button"))
                     }
                 }
             }
@@ -893,20 +941,18 @@ fun SettingsScreen(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("📖 功能介绍", fontWeight = FontWeight.Bold)
-                    Text("• 支持Excel/CSV文件导入联系人", style = MaterialTheme.typography.bodySmall)
-                    Text("• 自动拨打电话并播放语音", style = MaterialTheme.typography.bodySmall)
-                    Text("• 支持通话录音（需ROOT）", style = MaterialTheme.typography.bodySmall)
-                    Text("• 导出通话记录统计", style = MaterialTheme.typography.bodySmall)
-                    Text("• 支持剪贴板导入电话号码", style = MaterialTheme.typography.bodySmall)
-                    Text("• 支持多SIM卡选择与双卡交替拨打", style = MaterialTheme.typography.bodySmall)
-                    Text("• 自动检查更新与后台下载安装", style = MaterialTheme.typography.bodySmall)
+                    Text(LanguageManager.getString("settings_screen.feature_intro.title"), fontWeight = FontWeight.Bold)
+                    LanguageManager.getString("settings_screen.feature_intro.features").split("\n").forEach { feature ->
+                        if (feature.isNotBlank()) {
+                            Text(feature, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     
                     Button(
                         onClick = { showFeatureIntro = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("查看完整功能介绍")
+                        Text(LanguageManager.getString("settings_screen.feature_intro.view_full_button"))
                     }
                 }
             }
@@ -919,10 +965,12 @@ fun SettingsScreen(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("⚠️ 隐私政策与免责声明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                    Text("• 本软件仅供学习研究使用", style = MaterialTheme.typography.bodySmall)
-                    Text("• 严禁用于任何非法用途", style = MaterialTheme.typography.bodySmall)
-                    Text("• 使用者需自行承担法律责任", style = MaterialTheme.typography.bodySmall)
+                    Text(LanguageManager.getString("settings_screen.privacy_policy.title"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    LanguageManager.getString("settings_screen.privacy_policy.items").split("\n").forEach { item ->
+                        if (item.isNotBlank()) {
+                            Text(item, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     
                     Button(
                         onClick = { showPrivacyPolicy = true },
@@ -931,7 +979,7 @@ fun SettingsScreen(
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("查看完整协议")
+                        Text(LanguageManager.getString("settings_screen.privacy_policy.view_button"))
                     }
                 }
             }
@@ -945,11 +993,11 @@ fun SettingsScreen(
         
         AlertDialog(
             onDismissRequest = { if (!isDownloading) showUpdateDialog = false },
-            title = { Text("发现新版本") },
+            title = { Text(LanguageManager.getString("update_dialog.title")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("最新版本: ${updateInfo!!.first}", fontWeight = FontWeight.Bold)
-                    Text("\n更新内容:", fontWeight = FontWeight.Bold)
+                    Text(LanguageManager.getString("update_dialog.latest_version", updateInfo!!.first), fontWeight = FontWeight.Bold)
+                    Text(LanguageManager.getString("update_dialog.update_content"), fontWeight = FontWeight.Bold)
                     Text(updateInfo!!.second)
                     
                     if (isDownloading) {
@@ -959,7 +1007,7 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Text(
-                                "下载中... ${(downloadProgress * 100).toInt()}%",
+                                LanguageManager.getString("update_dialog.downloading_progress", (downloadProgress * 100).toInt()),
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
@@ -995,7 +1043,7 @@ fun SettingsScreen(
                             strokeWidth = 2.dp
                         )
                     }
-                    Text(if (isDownloading) "下载中" else "后台下载安装")
+                    Text(if (isDownloading) LanguageManager.getString("update_dialog.downloading") else LanguageManager.getString("update_dialog.install_now"))
                 }
             },
             dismissButton = {
@@ -1008,7 +1056,7 @@ fun SettingsScreen(
                     },
                     enabled = !isDownloading
                 ) {
-                    Text("浏览器下载")
+                    Text(LanguageManager.getString("update_dialog.browser_download"))
                 }
             }
         )
@@ -1018,7 +1066,7 @@ fun SettingsScreen(
     if (showFeatureIntro) {
         AlertDialog(
             onDismissRequest = { showFeatureIntro = false },
-            title = { Text("📖 功能介绍") },
+            title = { Text(LanguageManager.getString("feature_intro_dialog.title")) },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -1031,11 +1079,12 @@ fun SettingsScreen(
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("📞 自动拨打", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            Text("• 支持从Excel/CSV文件批量导入联系人", style = MaterialTheme.typography.bodySmall)
-                            Text("• 自动识别户号和余额信息", style = MaterialTheme.typography.bodySmall)
-                            Text("• 按顺序自动拨打电话", style = MaterialTheme.typography.bodySmall)
-                            Text("• 支持暂停、继续和停止操作", style = MaterialTheme.typography.bodySmall)
+                            Text(LanguageManager.getString("feature_intro_dialog.auto_call.title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LanguageManager.getString("feature_intro_dialog.auto_call.items").split("\n").forEach { item ->
+                                if (item.isNotBlank()) {
+                                    Text(item, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                     
@@ -1046,11 +1095,12 @@ fun SettingsScreen(
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("🔊 音频播放", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            Text("• 通话时自动播放预设语音文件", style = MaterialTheme.typography.bodySmall)
-                            Text("• 支持自定义导入音频文件", style = MaterialTheme.typography.bodySmall)
-                            Text("• 可选择不同场景的语音（余额不足、停电等）", style = MaterialTheme.typography.bodySmall)
-                            Text("• 注意：非ROOT设备可能无法让对方听到", style = MaterialTheme.typography.bodySmall)
+                            Text(LanguageManager.getString("feature_intro_dialog.audio_playback.title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LanguageManager.getString("feature_intro_dialog.audio_playback.items").split("\n").forEach { item ->
+                                if (item.isNotBlank()) {
+                                    Text(item, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                     
@@ -1061,10 +1111,12 @@ fun SettingsScreen(
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("🎙️ 通话录音", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            Text("• 自动录制通话内容", style = MaterialTheme.typography.bodySmall)
-                            Text("• 保存到本地存储", style = MaterialTheme.typography.bodySmall)
-                            Text("• 注意：需要ROOT权限才能正常工作", style = MaterialTheme.typography.bodySmall)
+                            Text(LanguageManager.getString("feature_intro_dialog.call_recording.title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LanguageManager.getString("feature_intro_dialog.call_recording.items").split("\n").forEach { item ->
+                                if (item.isNotBlank()) {
+                                    Text(item, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                     
@@ -1075,10 +1127,12 @@ fun SettingsScreen(
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("💳 SIM卡管理", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            Text("• 支持选择SIM卡1或SIM卡2拨打", style = MaterialTheme.typography.bodySmall)
-                            Text("• 双卡交替模式，轮流使用两张卡", style = MaterialTheme.typography.bodySmall)
-                            Text("• 智能识别可用SIM卡", style = MaterialTheme.typography.bodySmall)
+                            Text(LanguageManager.getString("feature_intro_dialog.sim_card.title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LanguageManager.getString("feature_intro_dialog.sim_card.items").split("\n").forEach { item ->
+                                if (item.isNotBlank()) {
+                                    Text(item, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                     
@@ -1089,11 +1143,12 @@ fun SettingsScreen(
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("📊 数据统计", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            Text("• 实时统计拨打次数和成功率", style = MaterialTheme.typography.bodySmall)
-                            Text("• 支持按拨打次数排序", style = MaterialTheme.typography.bodySmall)
-                            Text("• 支持按余额排序", style = MaterialTheme.typography.bodySmall)
-                            Text("• 导出CSV格式的通话记录", style = MaterialTheme.typography.bodySmall)
+                            Text(LanguageManager.getString("feature_intro_dialog.statistics.title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LanguageManager.getString("feature_intro_dialog.statistics.items").split("\n").forEach { item ->
+                                if (item.isNotBlank()) {
+                                    Text(item, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                     
@@ -1104,28 +1159,99 @@ fun SettingsScreen(
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("🔄 自动更新", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            Text("• 启动时自动检查最新版本", style = MaterialTheme.typography.bodySmall)
-                            Text("• 后台下载APK文件", style = MaterialTheme.typography.bodySmall)
-                            Text("• 显示下载进度", style = MaterialTheme.typography.bodySmall)
-                            Text("• 下载完成后自动触发安装", style = MaterialTheme.typography.bodySmall)
+                            Text(LanguageManager.getString("feature_intro_dialog.auto_update.title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LanguageManager.getString("feature_intro_dialog.auto_update.items").split("\n").forEach { item ->
+                                if (item.isNotBlank()) {
+                                    Text(item, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                 }
             },
             confirmButton = {
                 Button(onClick = { showFeatureIntro = false }) {
-                    Text("关闭")
+                    Text(LanguageManager.getString("common.close"))
                 }
             }
         )
     }
     
-    // 隐私政策对话框
+    // 隐私政策对话框（查看模式，拒绝时退出应用）
     if (showPrivacyPolicy) {
         DisclaimerDialog(
             onAccept = { showPrivacyPolicy = false },
-            onDecline = { showPrivacyPolicy = false }
+            onDecline = {
+                showPrivacyPolicy = false
+                onDeclineDisclaimer()
+            },
+            canDecline = true // 允许拒绝，拒绝后退出应用
+        )
+    }
+    
+    // 语言选择对话框
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(LanguageManager.getString("settings_screen.language.dialog_title")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    listOf(
+                        "zh" to LanguageManager.getLanguageDisplayName("zh"),
+                        "en" to LanguageManager.getLanguageDisplayName("en")
+                    ).forEach { (code, name) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setLanguage(code)
+                                    showLanguageDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedLanguage == code,
+                                    onClick = {
+                                        viewModel.setLanguage(code)
+                                        showLanguageDialog = false
+                                    }
+                                )
+                                Text(
+                                    name,
+                                    fontWeight = if (selectedLanguage == code) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                            
+                            if (code == "en") {
+                                Text(
+                                    LanguageManager.getString("settings_screen.language.ai_translated"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    }
+                    
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    
+                    Text(
+                        LanguageManager.getString("settings_screen.language.coming_soon"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(LanguageManager.getString("common.cancel"))
+                }
+            }
         )
     }
 }
@@ -1133,13 +1259,14 @@ fun SettingsScreen(
 @Composable
 fun DisclaimerDialog(
     onAccept: () -> Unit,
-    onDecline: () -> Unit
+    onDecline: () -> Unit,
+    canDecline: Boolean = true // 是否允许拒绝（首次启动时为true，查看时为false）
 ) {
     AlertDialog(
         onDismissRequest = { },
         title = { 
             Text(
-                "⚠️ 用户协议与隐私政策",
+                LanguageManager.getString("disclaimer_dialog.title"),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.error
             ) 
@@ -1157,11 +1284,12 @@ fun DisclaimerDialog(
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("🔒 重要声明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                        Text("• 本软件仅供学习研究使用，严禁用于任何非法用途", style = MaterialTheme.typography.bodySmall)
-                        Text("• 使用者需自行承担全部法律责任", style = MaterialTheme.typography.bodySmall)
-                        Text("• 开发者不对任何使用后果负责", style = MaterialTheme.typography.bodySmall)
-                        Text("• 请勿骚扰他人或进行恶意拨打", style = MaterialTheme.typography.bodySmall)
+                        Text(LanguageManager.getString("disclaimer_dialog.security_notice.title"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                        LanguageManager.getString("disclaimer_dialog.security_notice.items").split("\n").forEach { item ->
+                            if (item.isNotBlank()) {
+                                Text(item, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
                 }
 
@@ -1173,17 +1301,19 @@ fun DisclaimerDialog(
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("❗ 功能限制说明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                        Text(LanguageManager.getString("disclaimer_dialog.function_limitation.title"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                         Text(
-                            "⚠️ 由于Android系统安全限制，以下功能可能受限：",
+                            LanguageManager.getString("disclaimer_dialog.function_limitation.warning"),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text("• 通话录音功能在非ROOT设备上可能无法正常工作", style = MaterialTheme.typography.bodySmall)
-                        Text("• 音频注入（让对方听到语音）可能被系统阻止", style = MaterialTheme.typography.bodySmall)
-                        Text("• 部分Android版本会严格限制应用访问通话音频通道", style = MaterialTheme.typography.bodySmall)
-                        Text("\n💡 建议：如需完整功能，请使用已ROOT的设备或特定品牌手机", style = MaterialTheme.typography.bodySmall)
+                        LanguageManager.getString("disclaimer_dialog.function_limitation.items").split("\n").forEach { item ->
+                            if (item.isNotBlank()) {
+                                Text(item, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        Text(LanguageManager.getString("disclaimer_dialog.root_suggestion"), style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
@@ -1195,13 +1325,12 @@ fun DisclaimerDialog(
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("📋 权限使用说明", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("• CALL_PHONE：用于自动拨打电话功能", style = MaterialTheme.typography.bodySmall)
-                        Text("• READ_PHONE_STATE：用于监听通话状态和SIM卡信息", style = MaterialTheme.typography.bodySmall)
-                        Text("• RECORD_AUDIO：用于通话录音功能（可选）", style = MaterialTheme.typography.bodySmall)
-                        Text("• READ_MEDIA_AUDIO：用于读取和播放音频文件", style = MaterialTheme.typography.bodySmall)
-                        Text("• INTERNET：用于检查软件更新", style = MaterialTheme.typography.bodySmall)
-                        Text("• REQUEST_INSTALL_PACKAGES：用于安装更新的APK文件", style = MaterialTheme.typography.bodySmall)
+                        Text(LanguageManager.getString("disclaimer_dialog.permission_notice.title"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        LanguageManager.getString("disclaimer_dialog.permission_notice.items").split("\n").forEach { item ->
+                            if (item.isNotBlank()) {
+                                Text(item, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
                 }
 
@@ -1213,16 +1342,17 @@ fun DisclaimerDialog(
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("🔐 隐私保护", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                        Text("• 本软件不会收集、上传或分享任何个人信息", style = MaterialTheme.typography.bodySmall)
-                        Text("• 所有数据仅存储在本地设备中", style = MaterialTheme.typography.bodySmall)
-                        Text("• 联系人信息、通话记录等数据完全由用户控制", style = MaterialTheme.typography.bodySmall)
-                        Text("• 软件不包含任何广告或追踪代码", style = MaterialTheme.typography.bodySmall)
+                        Text(LanguageManager.getString("disclaimer_dialog.privacy_policy.title"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        LanguageManager.getString("disclaimer_dialog.privacy_policy.items").split("\n").forEach { item ->
+                            if (item.isNotBlank()) {
+                                Text(item, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
                 }
 
                 Text(
-                    "点击「我同意」表示您已阅读并完全理解以上内容，同意使用本软件",
+                    LanguageManager.getString("disclaimer_dialog.accept_notice"),
                     style = MaterialTheme.typography.bodySmall,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                     fontWeight = FontWeight.Bold
@@ -1236,12 +1366,14 @@ fun DisclaimerDialog(
                     containerColor = MaterialTheme.colorScheme.primary
                 )
             ) {
-                Text("我同意")
+                Text(LanguageManager.getString("disclaimer_dialog.accept_button"))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDecline) {
-                Text("拒绝", color = MaterialTheme.colorScheme.error)
+            if (canDecline) {
+                TextButton(onClick = onDecline) {
+                    Text(LanguageManager.getString("disclaimer_dialog.decline_button"), color = MaterialTheme.colorScheme.error)
+                }
             }
         }
     )
@@ -1256,14 +1388,14 @@ fun StatusCard(status: String, progress: Int, total: Int) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("当前状态", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(LanguageManager.getString("status_card.title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(status, style = MaterialTheme.typography.bodyLarge)
             if (total > 0) {
                 LinearProgressIndicator(
                     progress = { if (total > 0) progress.toFloat() / total else 0f },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("进度: $progress / $total", style = MaterialTheme.typography.bodySmall)
+                Text(LanguageManager.getString("status_card.progress", progress, total), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -1287,9 +1419,9 @@ fun AudioSelector(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("默认音频选择", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(LanguageManager.getString("audio_selector.title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Button(onClick = onImportAudio) {
-                    Text("导入音频")
+                    Text(LanguageManager.getString("audio_selector.import_button"))
                 }
             }
 
@@ -1299,10 +1431,10 @@ fun AudioSelector(
             ) {
                 itemsIndexed(allAudios) { index, _ ->
                     val displayName = when (index) {
-                        0 -> "余额不足"
-                        1 -> "停电"
-                        2 -> "欠费"
-                        else -> "自定义${index - 2}"
+                        0 -> LanguageManager.getString("audio_selector.audio_0")
+                        1 -> LanguageManager.getString("audio_selector.audio_1")
+                        2 -> LanguageManager.getString("audio_selector.audio_2")
+                        else -> LanguageManager.getString("audio_selector.custom_audio", index - 2)
                     }
                     FilterChip(
                         selected = selectedIndex == index,
@@ -1313,7 +1445,7 @@ fun AudioSelector(
             }
 
             Text(
-                text = "当前选中: ${allAudios.getOrElse(selectedIndex) { allAudios.firstOrNull() ?: "" }}",
+                text = LanguageManager.getString("audio_selector.current_selected", allAudios.getOrElse(selectedIndex) { allAudios.firstOrNull() ?: "" }),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -1327,7 +1459,7 @@ fun StatisticsCard(statistics: String) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("通话统计", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(LanguageManager.getString("statistics_card.title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(statistics, style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -1337,11 +1469,11 @@ fun StatisticsCard(statistics: String) {
 fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
     var showDialog by remember { mutableStateOf(false) }
     val modeText = when (simCardMode) {
-        0 -> "默认卡"
-        1 -> "SIM卡1"
-        2 -> "SIM卡2"
-        3 -> "双卡交替"
-        else -> "默认卡"
+        0 -> LanguageManager.getString("sim_card.mode_default")
+        1 -> LanguageManager.getString("sim_card.mode_sim1")
+        2 -> LanguageManager.getString("sim_card.mode_sim2")
+        3 -> LanguageManager.getString("sim_card.mode_alternate")
+        else -> LanguageManager.getString("sim_card.mode_default")
     }
     
     Card(
@@ -1356,19 +1488,19 @@ fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("SIM卡选择", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(LanguageManager.getString("sim_card_selector.title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "当前模式: $modeText",
+                    LanguageManager.getString("sim_card_selector.current_mode", modeText),
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    "点击选择拨打方式",
+                    LanguageManager.getString("sim_card_selector.hint"),
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary)
                 )
             }
             Icon(
                 Icons.Default.ArrowDropDown,
-                contentDescription = "选择",
+                contentDescription = LanguageManager.getString("common.select"),
                 tint = MaterialTheme.colorScheme.primary
             )
         }
@@ -1377,14 +1509,14 @@ fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("选择SIM卡模式") },
+            title = { Text(LanguageManager.getString("sim_card_selector.dialog_title")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
-                        0 to "默认卡 - 使用系统默认SIM卡",
-                        1 to "SIM卡1 - 强制使用卡槽1",
-                        2 to "SIM卡2 - 强制使用卡槽2",
-                        3 to "双卡交替 - 轮流使用两张卡"
+                        0 to LanguageManager.getString("sim_card.option_0"),
+                        1 to LanguageManager.getString("sim_card.option_1"),
+                        2 to LanguageManager.getString("sim_card.option_2"),
+                        3 to LanguageManager.getString("sim_card.option_3")
                     ).forEach { (mode, description) ->
                         Card(
                             modifier = Modifier
@@ -1418,7 +1550,7 @@ fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
                                 if (simCardMode == mode) {
                                     Icon(
                                         Icons.Default.Check,
-                                        contentDescription = "已选择",
+                                        contentDescription = LanguageManager.getString("sim_card.selected"),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
@@ -1429,7 +1561,7 @@ fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
             },
             confirmButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("取消")
+                    Text(LanguageManager.getString("common.cancel"))
                 }
             }
         )
@@ -1439,7 +1571,7 @@ fun SimCardSelector(simCardMode: Int, onModeSelected: (Int) -> Unit) {
 @Composable
 fun ExportButton(onExport: () -> Unit) {
     Button(onClick = onExport, modifier = Modifier.fillMaxWidth()) {
-        Text("导出联系人列表")
+        Text(LanguageManager.getString("export_button.text"))
     }
 }
 
@@ -1457,15 +1589,15 @@ fun ControlButtons(
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onImportFile, enabled = !isRunning, modifier = Modifier.weight(1f)) {
-                Text("导入电话")
+                Text(LanguageManager.getString("control_buttons.import_phone"))
             }
             Button(onClick = onImportClipboard, enabled = !isRunning, modifier = Modifier.weight(1f)) {
-                Text("导入剪贴板")
+                Text(LanguageManager.getString("control_buttons.import_clipboard"))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onStart, enabled = !isRunning, modifier = Modifier.weight(1f)) {
-                Text("开始拨打")
+                Text(LanguageManager.getString("control_buttons.start_call"))
             }
             if (isRunning && !isPaused) {
                 Button(
@@ -1474,7 +1606,7 @@ fun ControlButtons(
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                 ) {
-                    Text("暂停")
+                    Text(LanguageManager.getString("control_buttons.pause"))
                 }
             } else if (isRunning && isPaused) {
                 Button(
@@ -1483,14 +1615,14 @@ fun ControlButtons(
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("继续")
+                    Text(LanguageManager.getString("control_buttons.resume"))
                 }
             }
             Button(
                 onClick = onStop, enabled = isRunning, modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
-                Text("停止")
+                Text(LanguageManager.getString("control_buttons.stop"))
             }
         }
     }
@@ -1504,7 +1636,7 @@ fun PhoneList(phoneList: List<PhoneEntry>, onPhoneClick: (PhoneEntry) -> Unit = 
     ) {
         if (phoneList.isEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                Text("暂无电话数据")
+                Text(LanguageManager.getString("phone_list.empty"))
             }
         } else {
             LazyColumn(
@@ -1538,7 +1670,7 @@ fun PhoneItem(entry: PhoneEntry, onClick: () -> Unit = {}) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    entry.contactName.ifEmpty { "未知联系人" },
+                    entry.contactName.ifEmpty { LanguageManager.getString("phone_item.unknown_contact") },
                     style = MaterialTheme.typography.titleSmall, 
                     fontWeight = FontWeight.Bold,
                     color = if (entry.isCalled) 
@@ -1557,7 +1689,7 @@ fun PhoneItem(entry: PhoneEntry, onClick: () -> Unit = {}) {
                 
                 // 显示拨打状态
                 Text(
-                    if (entry.isCalled) "✓ 已拨打 (${entry.callCount}次)" else "○ 未拨打",
+                    if (entry.isCalled) LanguageManager.getString("phone_item.called", entry.callCount) else LanguageManager.getString("phone_item.not_called"),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (entry.isCalled) 
                         MaterialTheme.colorScheme.primary
@@ -1569,7 +1701,7 @@ fun PhoneItem(entry: PhoneEntry, onClick: () -> Unit = {}) {
                 // 显示户号信息
                 if (!entry.accountNumber.isNullOrEmpty()) {
                     Text(
-                        "户号: ${entry.accountNumber}",
+                        LanguageManager.getString("phone_item.account_number", entry.accountNumber),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (entry.isCalled) 
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
@@ -1581,7 +1713,7 @@ fun PhoneItem(entry: PhoneEntry, onClick: () -> Unit = {}) {
                 // 显示余额信息
                 if (!entry.balance.isNullOrEmpty()) {
                     Text(
-                        "余额: ${entry.balance}",
+                        LanguageManager.getString("phone_item.balance", entry.balance),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (entry.isCalled) 
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
@@ -1661,7 +1793,7 @@ fun checkUpdateIfNeeded(
                     if (responseBody != null) {
                         val json = JSONObject(responseBody)
                         val version = json.getString("tag_name")
-                        val content = json.optString("body", "暂无更新说明")
+                        val content = json.optString("body", LanguageManager.getString("status.update_content_empty"))
                         val htmlUrl = json.getString("html_url")
                         
                         // 获取APK下载链接
@@ -1687,7 +1819,7 @@ fun checkUpdateIfNeeded(
                     }
                 }
             } catch (e: Exception) {
-                Log.e("UpdateCheck", "自动检查更新失败: ${e.message}")
+                Log.e("UpdateCheck", LanguageManager.getString("log.auto_update_check_failed", e.message ?: ""))
             }
         }
     }
@@ -1710,10 +1842,10 @@ fun downloadAndInstallApk(
                 val response = client.newCall(request).execute()
                 
                 if (!response.isSuccessful) {
-                    throw Exception("下载失败: HTTP ${response.code}")
+                    throw Exception(LanguageManager.getString("status.download_failed_http", response.code))
                 }
                 
-                val body = response.body ?: throw Exception("响应体为空")
+                val body = response.body ?: throw Exception(LanguageManager.getString("status.empty_response_body"))
                 val contentLength = body.contentLength()
                 val inputStream = body.byteStream()
                 
@@ -1772,7 +1904,7 @@ fun downloadAndInstallApk(
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 snackbarHostState.showSnackbar(
-                    "下载失败: ${e.message}",
+                    LanguageManager.getString("update_dialog.download_failed", e.message ?: ""),
                     duration = SnackbarDuration.Long
                 )
                 onError()
