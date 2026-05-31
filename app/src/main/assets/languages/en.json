@@ -32,7 +32,8 @@
 
   "control_buttons": {
     "import_phone": "Import Phone",
-    "import_clipboard": "Import Clipboard",
+    "import_clipboard": "📋 Import from Clipboard",
+    "clipboard_hint": "Supports multiple numbers, auto-detects spaces, dashes, commas, etc.",
     "start_call": "Start Calling",
     "pause": "Pause",
     "resume": "Resume",

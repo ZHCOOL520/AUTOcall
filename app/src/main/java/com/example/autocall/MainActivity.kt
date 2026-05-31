@@ -1587,14 +1587,28 @@ fun ControlButtons(
     onImportClipboard: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onImportFile, enabled = !isRunning, modifier = Modifier.weight(1f)) {
-                Text(LanguageManager.getString("control_buttons.import_phone"))
-            }
-            Button(onClick = onImportClipboard, enabled = !isRunning, modifier = Modifier.weight(1f)) {
-                Text(LanguageManager.getString("control_buttons.import_clipboard"))
-            }
+        // 导入文件按钮
+        Button(onClick = onImportFile, enabled = !isRunning, modifier = Modifier.fillMaxWidth()) {
+            Text(LanguageManager.getString("control_buttons.import_phone"))
         }
+        // 剪贴板导入按钮（醒目独立行 + 提示文字）
+        OutlinedButton(
+            onClick = onImportClipboard,
+            enabled = !isRunning,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Text(LanguageManager.getString("control_buttons.import_clipboard"))
+        }
+        Text(
+            text = LanguageManager.getString("control_buttons.clipboard_hint"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+        )
+        // 拨打控制按钮
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onStart, enabled = !isRunning, modifier = Modifier.weight(1f)) {
                 Text(LanguageManager.getString("control_buttons.start_call"))

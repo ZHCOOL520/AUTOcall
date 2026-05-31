@@ -522,17 +522,18 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.clipboard_empty") }
                     return@launch
                 }
-                
+                    
                 val phoneList = mutableListOf<PhoneEntry>()
-                
-                // 按行分割文本
-                val lines = clipboardText.split(Regex("[\r\n]+"))
+                    
+                // 先尝试按常见分隔符拆分（逗号、分号、竖线等），再按行分割
+                val separators = Regex("[,;，；|\\n\\r]+")
+                val segments = clipboardText.split(separators)
                     .map { it.trim() }
                     .filter { it.isNotEmpty() }
-                
-                for (line in lines) {
-                    // 尝试从每一行中提取电话号码
-                    val phone = extractPhoneNumber(line)
+                    
+                for (segment in segments) {
+                    // 尝试从每个片段中提取电话号码
+                    val phone = extractPhoneNumber(segment)
                     if (!phone.isNullOrEmpty()) {
                         // 检查是否已存在相同号码
                         if (phoneList.none { it.phoneNumber == phone }) {
@@ -540,12 +541,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                         }
                     }
                 }
-                
+                    
                 if (phoneList.isEmpty()) {
                     withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.clipboard_no_phone") }
                     return@launch
                 }
-                
+                    
                 withContext(Dispatchers.Main) {
                     // 追加到现有列表，而不是替换
                     val currentList = _phoneList.value.toMutableList()
@@ -602,10 +603,14 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         // 匹配常见的序号格式：数字+标点符号开头
         processed = processed.replace(Regex("^\\d+[.、,)）\\s]+"), "")
         
-        // 第一步：基础清理 - 去除所有非数字和+号字符
+        // 第一步：处理常见电话号码分隔符
+        // 去除空格、横杠、括号、点号、逗号、斜杠等常见格式化字符
+        processed = processed.replace(Regex("[\\s\\-()（）\\[\\]{}.，、/]+"), "")
+        
+        // 第二步：基础清理 - 去除所有非数字和+号字符
         var cleaned = processed.replace(Regex("[^0-9+]"), "")
         
-        // 第二步：处理国家代码
+        // 第三步：处理国家代码
         // 去除+86或86前缀（中国大陆）
         if (cleaned.startsWith("+86")) cleaned = cleaned.substring(3)
         else if (cleaned.startsWith("86") && cleaned.length > 11) cleaned = cleaned.substring(2)
@@ -618,10 +623,10 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         else if (cleaned.startsWith("+81")) cleaned = cleaned.substring(3) // 日本
         else if (cleaned.startsWith("+82")) cleaned = cleaned.substring(3) // 韩国
         
-        // 第三步：处理国内长途前缀0
+        // 第四步：处理国内长途前缀0
         if (cleaned.startsWith("0") && cleaned.length in 11..12) cleaned = cleaned.substring(1)
         
-        // 第四步：严格验证并返回有效号码（仅接受中国大陆手机号）
+        // 第五步：严格验证并返回有效号码（仅接受中国大陆手机号）
         return when {
             // 中国大陆手机号：1开头的11位数字，第二位为3-9
             cleaned.matches(Regex("^1[3-9]\\d{9}$")) -> cleaned
@@ -1010,15 +1015,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     fun resumeAutoCall(context: Context) {
         if (_isRunning.value && _isPaused.value) {
             Log.d(tag, LanguageManager.getString("log.resume_auto_call", _currentIndex.value))
+            // 仅解除暂停状态，让原协程循环从暂停处自然继续，不启动新协程
+            // 原循环在 while (_isPaused.value && _isRunning.value) 处等待，
+            // 恢复后从 _currentIndex 对应的号码继续拨打，不会跳过
             _isPaused.value = false
             _currentStatus.value = LanguageManager.getString("status.resuming")
-            // 从下一个位置继续拨打（当前索引已经处理完成）
-            val nextIndex = if (_currentIndex.value + 1 < _phoneList.value.size) {
-                _currentIndex.value + 1
-            } else {
-                _currentIndex.value
-            }
-            startAutoCallFromIndex(context, nextIndex)
         }
     }
 

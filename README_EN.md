@@ -9,7 +9,7 @@
 >
 > **By downloading, you acknowledge that you have read and agree to the above statements**
 
-![Version](https://img.shields.io/badge/version-4.1.0-blue)
+![Version](https://img.shields.io/badge/version-4.1.1-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
 
@@ -24,29 +24,29 @@ A powerful Android automatic phone dialing system with support for batch calling
 ### Batch Dialing
 - Support for Excel (.xlsx/.xls) and CSV file import
 - Smart column header recognition (phone, name, account number, balance, etc.)
-- **Clipboard Import**: One-click phone number extraction
-- Tap a contact to call directly
+- **One-Click Clipboard Import**: Copy numbers and tap the button to auto-detect
+- Tap a contact to initiate a call directly
 
-### Audio Injection
-- Direct audio injection into the call channel via `AudioTrack`
+### Call Audio Injection
+- Inject audio directly into the call channel via `AudioTrack`
 - No speaker output on your end; only the other party hears the audio
 - Automatic playback stop when the call ends
 
 ### Call Recording
-- Real-time recording functionality (ROOT permission recommended for best results)
-- MP3 format with automatic file saving
-- Recording path written to call logs
+- Real-time recording with automatic MP3 file saving
+- Works on both ROOT and non-ROOT devices (ROOT recommended for best results)
+- Recording paths automatically linked to call logs
 
 ### Multi-SIM Support
-- Select SIM Card 1 / SIM Card 2
-- Dual-SIM alternating dialing mode
-- Default SIM card mode
+- Select SIM Card 1 or SIM Card 2 for dialing
+- Dual-SIM alternating mode with automatic rotation
+- Default SIM mode using the system-configured SIM card
 
 ### Data Management
-- **Balance Sorting**: Ascending/descending toggle
-- **Call Statistics**: Track dialing counts
-- **Export Function**: CSV format, Windows-compatible
-- **Data Persistence**: Auto-save contacts and call records
+- **Balance & Call Count Sorting**: Toggle ascending/descending with one tap
+- **Call Statistics**: Auto-track dial count, duration, and success rate
+- **CSV Export**: Windows-compatible format for easy post-processing
+- **Data Persistence**: Contacts and call records auto-saved, surviving app restarts
 
 ---
 
@@ -110,7 +110,15 @@ Tap the **Settings** icon in the top-right corner:
 
 ## Changelog
 
-### v4.1.0 (2026-05-29) - New Feature
+### v4.1.1 (2026-06-01) - Bug Fix & Optimization
+
+- **Pause/Resume Fix**: Fixed the issue where resuming after pause would skip the current number; now correctly continues from the paused position
+- **Clipboard Import Enhancement**: Added support for more delimiters (comma, semicolon, pipe), auto-handles spaces, dashes, parentheses, and other formats
+- **Clipboard Button Improvement**: Redesigned clipboard import button with dedicated row and format hint text
+
+---
+
+### v4.1.0 (2026-05-29) - Multi-language Support
 
 - **Multi-language Support**: Added Chinese/English language switching with real-time UI text translation
 - **i18n Framework**: Integrated LanguageManager for dynamic translation based on JSON configuration files
@@ -143,26 +151,9 @@ Tap the **Settings** icon in the top-right corner:
 - Fixed SIM card selection dialog using SubscriptionManager API
 - Added READ_PHONE_STATE permission check
 
-### v3.1.1 (2026-05-15)
-- Fixed version comparison logic using semantic versioning
-
-### v3.0.0 (2026-05-15)
-- UI restructure with independent settings page
-- SIM card selection optimization with dialog interface
-- Audio management optimization
-
-### v2.1.0 (2026-05-06)
-- Clipboard import feature
-- Enhanced phone number recognition algorithm
-- Smart deduplication and append mode
-
-### v2.0.0 (2026-05-03)
-- Data persistence feature
-- Call count statistics
-- Windows CSV compatibility
-- MP3 recording format
-
 ---
+
+> See [CHANGELOG.md](CHANGELOG.md) for earlier version history
 
 ## FAQ
 
