@@ -308,6 +308,10 @@
     "unknown_error": "未知错误",
     "download_failed_http": "下载失败: HTTP %d",
     "empty_response_body": "响应体为空",
+    "download_failed_storage": "存储空间不足，无法下载更新（需要至少50MB）",
+    "download_failed_network": "网络连接超时，请检查网络后重试",
+    "install_preparing": "正在准备安装...",
+    "install_failed_hint": "安装启动失败，请在文件管理器中手动打开下载的APK文件: %s",
     "csv_header": "姓名,手机号,余额,户号,拨打次数"
   },
 

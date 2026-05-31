@@ -447,6 +447,7 @@ fun MainScreen(
     if (showUpdateDialog && updateInfo != null) {
         var isDownloading by remember { mutableStateOf(false) }
         var downloadProgress by remember { mutableStateOf(0f) }
+        var downloadError by remember { mutableStateOf<String?>(null) }
         val snackbarHostState = remember { SnackbarHostState() }
         
         AlertDialog(
@@ -471,12 +472,23 @@ fun MainScreen(
                             )
                         }
                     }
+                    
+                    if (downloadError != null) {
+                        Text(
+                            downloadError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         isDownloading = true
+                        downloadError = null
+                        downloadProgress = 0f
                         downloadAndInstallApk(
                             context = context,
                             apkUrl = updateInfo!!.third,
@@ -488,8 +500,9 @@ fun MainScreen(
                                 isDownloading = false
                                 showUpdateDialog = false
                             },
-                            onError = {
+                            onError = { errorMsg ->
                                 isDownloading = false
+                                downloadError = errorMsg
                             }
                         )
                     },
@@ -990,6 +1003,7 @@ fun SettingsScreen(
     if (showUpdateDialog && updateInfo != null) {
         var isDownloading by remember { mutableStateOf(false) }
         var downloadProgress by remember { mutableStateOf(0f) }
+        var downloadError by remember { mutableStateOf<String?>(null) }
         
         AlertDialog(
             onDismissRequest = { if (!isDownloading) showUpdateDialog = false },
@@ -1013,12 +1027,23 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    
+                    if (downloadError != null) {
+                        Text(
+                            downloadError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         isDownloading = true
+                        downloadError = null
+                        downloadProgress = 0f
                         downloadAndInstallApk(
                             context = context,
                             apkUrl = updateInfo!!.third,
@@ -1030,8 +1055,9 @@ fun SettingsScreen(
                                 isDownloading = false
                                 showUpdateDialog = false
                             },
-                            onError = {
+                            onError = { errorMsg ->
                                 isDownloading = false
+                                downloadError = errorMsg
                             }
                         )
                     },
@@ -1840,89 +1866,136 @@ fun checkUpdateIfNeeded(
 }
 
 // 下载并安装APK
+private var downloadJob: kotlinx.coroutines.Job? = null
+
 fun downloadAndInstallApk(
     context: Context,
     apkUrl: String,
     snackbarHostState: androidx.compose.material3.SnackbarHostState,
     onProgress: (Float) -> Unit = {},
     onComplete: () -> Unit = {},
-    onError: () -> Unit = {}
+    onError: (String) -> Unit = {}
 ) {
-    CoroutineScope(Dispatchers.Main).launch {
+    downloadJob?.cancel()
+    downloadJob = CoroutineScope(Dispatchers.Main).launch {
+        var inputStream: java.io.InputStream? = null
+        var apkFile: File? = null
         try {
-            withContext(Dispatchers.IO) {
-                val client = OkHttpClient()
-                val request = Request.Builder().url(apkUrl).build()
-                val response = client.newCall(request).execute()
-                
-                if (!response.isSuccessful) {
-                    throw Exception(LanguageManager.getString("status.download_failed_http", response.code))
-                }
-                
-                val body = response.body ?: throw Exception(LanguageManager.getString("status.empty_response_body"))
-                val contentLength = body.contentLength()
-                val inputStream = body.byteStream()
-                
-                // 保存到缓存目录
-                val apkFile = File(context.cacheDir, "update.apk")
-                apkFile.outputStream().use { output ->
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
-                    var totalBytesRead = 0L
-                    
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        totalBytesRead += bytesRead
-                        
-                        // 更新进度
-                        if (contentLength > 0) {
-                            val progress = totalBytesRead.toFloat() / contentLength.toFloat()
-                            withContext(Dispatchers.Main) {
-                                onProgress(progress)
-                            }
+            // 检查存储空间（至少需要 50MB）
+            val cacheDir = context.cacheDir
+            val availableBytes = cacheDir.freeSpace
+            if (availableBytes < 50 * 1024 * 1024) {
+                val msg = LanguageManager.getString("status.download_failed_storage")
+                snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
+                onError(msg)
+                return@launch
+            }
+
+            // 配置超时的 OkHttpClient
+            val client = OkHttpClient.Builder()
+                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+
+            val request = Request.Builder().url(apkUrl).build()
+            val response = client.newCall(request).execute()
+
+            if (!response.isSuccessful) {
+                throw Exception(LanguageManager.getString("status.download_failed_http", response.code))
+            }
+
+            val body = response.body ?: throw Exception(LanguageManager.getString("status.empty_response_body"))
+            val contentLength = body.contentLength()
+            inputStream = body.byteStream()
+
+            // 清理旧的下载文件
+            val oldApk = File(cacheDir, "update.apk")
+            if (oldApk.exists()) oldApk.delete()
+
+            apkFile = File(cacheDir, "update.apk")
+            apkFile.outputStream().use { output ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                var totalBytesRead = 0L
+                var lastProgressUpdate = 0L
+
+                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    totalBytesRead += bytesRead
+
+                    // 限制进度更新频率，每 200ms 最多更新一次
+                    val now = System.currentTimeMillis()
+                    if (contentLength > 0 && now - lastProgressUpdate > 200) {
+                        lastProgressUpdate = now
+                        withContext(Dispatchers.Main) {
+                            onProgress(totalBytesRead.toFloat() / contentLength.toFloat())
                         }
                     }
                 }
-                
-                withContext(Dispatchers.Main) {
-                    // 触发安装
-                    val uri = androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        apkFile
-                    )
-                    
-                    val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                        data = uri
+            }
+
+            withContext(Dispatchers.Main) {
+                onProgress(1f) // 确保进度显示100%
+                snackbarHostState.showSnackbar(
+                    LanguageManager.getString("status.install_preparing"),
+                    duration = SnackbarDuration.Short
+                )
+            }
+
+            // 触发安装
+            val apk = apkFile
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", apk
+            )
+
+            try {
+                val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                    data = uri
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                    putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                }
+                context.startActivity(intent)
+                withContext(Dispatchers.Main) { onComplete() }
+            } catch (installEx: Exception) {
+                try {
+                    val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                        putExtra(Intent.EXTRA_RETURN_RESULT, false)
                     }
-                    
-                    try {
-                        context.startActivity(intent)
-                        onComplete()
-                    } catch (e: Exception) {
-                        // 如果INSTALL_PACKAGE失败，尝试ACTION_VIEW
-                        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, "application/vnd.android.package-archive")
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(viewIntent)
-                        onComplete()
+                    context.startActivity(viewIntent)
+                    withContext(Dispatchers.Main) { onComplete() }
+                } catch (viewEx: Exception) {
+                    val msg = LanguageManager.getString(
+                        "status.install_failed_hint",
+                        viewEx.message ?: LanguageManager.getString("status.unknown_error")
+                    )
+                    withContext(Dispatchers.Main) {
+                        snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
+                        onError(msg)
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: java.net.SocketTimeoutException) {
+            val msg = LanguageManager.getString("status.download_failed_network")
             withContext(Dispatchers.Main) {
-                snackbarHostState.showSnackbar(
-                    LanguageManager.getString("update_dialog.download_failed", e.message ?: ""),
-                    duration = SnackbarDuration.Long
-                )
-                onError()
+                snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
+                onError(msg)
             }
+        } catch (e: java.io.InterruptedIOException) {
+            Log.w("Download", "Download cancelled", e)
+        } catch (e: Exception) {
+            val msg = LanguageManager.getString("update_dialog.download_failed", e.message ?: "")
+            withContext(Dispatchers.Main) {
+                snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
+                onError(msg)
+            }
+        } finally {
+            try { inputStream?.close() } catch (_: Exception) {}
+            try { downloadJob = null } catch (_: Exception) {}
         }
     }
 }

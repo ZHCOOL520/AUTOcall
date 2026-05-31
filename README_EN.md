@@ -115,6 +115,7 @@ Tap the **Settings** icon in the top-right corner:
 - **Pause/Resume Fix**: Fixed the issue where resuming after pause would skip the current number; now correctly continues from the paused position
 - **Clipboard Import Enhancement**: Added support for more delimiters (comma, semicolon, pipe), auto-handles spaces, dashes, parentheses, and other formats
 - **Clipboard Button Improvement**: Redesigned clipboard import button with dedicated row and format hint text
+- **Background Download Fix**: Added network timeout, storage check, progress throttle, and manual APK open fallback on install failure
 
 ---
 

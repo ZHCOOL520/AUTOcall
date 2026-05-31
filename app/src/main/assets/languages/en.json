@@ -308,6 +308,10 @@
     "unknown_error": "Unknown error",
     "download_failed_http": "Download failed: HTTP %d",
     "empty_response_body": "Response body is empty",
+    "download_failed_storage": "Insufficient storage space to download update (at least 50MB required)",
+    "download_failed_network": "Network connection timed out, please check your network and try again",
+    "install_preparing": "Preparing to install...",
+    "install_failed_hint": "Failed to start installation, please manually open the downloaded APK file: %s",
     "csv_header": "Name,Phone,Balance,Account Number,Call Count"
   },
 

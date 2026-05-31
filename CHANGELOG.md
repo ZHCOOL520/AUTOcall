@@ -55,3 +55,8 @@
 - **Call Count Statistics**
 - **Windows CSV Compatibility**
 - **MP3 Recording Format**
+
+ ---
+## v1.0.0 (2026-05-02)
+
+软件第一行代码
