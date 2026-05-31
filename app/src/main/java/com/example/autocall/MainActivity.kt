@@ -120,8 +120,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         checkAndRequestPermissions()
         
-        // 注意：不在这里初始化LanguageManager，等待ViewModel加载设置后自动初始化
-        // LanguageManager会在loadLanguageSettings()中被正确初始化
+        // 同步初始化语言管理器，确保首次显示UI时语言正确
+        // （用户协议对话框等需要立即显示正确的语言）
+        val dataPrefs = getSharedPreferences("app_data", MODE_PRIVATE)
+        val hasSavedLanguage = dataPrefs.contains("app_language")
+        val language = if (hasSavedLanguage) {
+            dataPrefs.getString("app_language", "zh") ?: "zh"
+        } else {
+            val systemLocale = java.util.Locale.getDefault()
+            when (systemLocale.language.lowercase()) {
+                "en" -> "en"
+                else -> "zh"
+            }
+        }
+        LanguageManager.init(this, language)
 
         setContent {
             AUTOCallTheme {

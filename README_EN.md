@@ -116,6 +116,7 @@ Tap the **Settings** icon in the top-right corner:
 - **Clipboard Import Enhancement**: Added support for more delimiters (comma, semicolon, pipe), auto-handles spaces, dashes, parentheses, and other formats
 - **Clipboard Button Improvement**: Redesigned clipboard import button with dedicated row and format hint text
 - **Background Download Fix**: Added network timeout, storage check, progress throttle, and manual APK open fallback on install failure
+- **Disclaimer Language Fix**: Fixed issue where disclaimer dialog showed Chinese in English mode; now synchronously initializes LanguageManager at startup
 
 ---
 
