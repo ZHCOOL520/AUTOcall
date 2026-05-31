@@ -4,7 +4,23 @@
 
 ---
 
-## v3.0.0 (2026-05-15)
+## v3.1.1 (2026-05-15)
+
+### 中文
+
+- 🐛 **版本比较修复**：修复版本号比较逻辑，使用语义化版本比较
+- 🔧 **代码优化**：改进自动检查更新和手动检查更新的版本判断
+- 🐛 **问题修复**：修复版本显示不一致问题
+
+### English
+
+- **Version Comparison Fix**: Fixed version number comparison logic using semantic versioning
+- **Code Optimization**: Improved version checking for both auto and manual update checks
+- **Bug Fix**: Resolved version display inconsistency issue
+
+---
+
+## v3.0.0 (2026-05-14)
 
 ### 中文
 
@@ -57,6 +73,42 @@
 - **MP3 Recording Format**
 
  ---
+## v1.3.0 (2026-05-03)
+
+### 中文
+
+- ✅ **音频开关**：添加了音频播放开关功能
+- ✅ **联系人识别类型**：增强联系人识别能力
+- ✅ **排序功能**：添加列表排序功能
+- ✅ **点击拨打**：添加点击列表联系人即可拨打电话功能
+
+### English
+
+- **Audio Toggle**: Added audio playback on/off switch
+- **Contact Recognition Types**: Enhanced contact recognition capabilities
+- **Sorting Feature**: Added list sorting functionality
+- **Click to Call**: Added tap-to-call feature on contact list items
+
+---
+
+## v1.2.0 (2026-05-02)
+
+### 中文
+
+- ✅ **功能完善**：基础功能优化与完善
+
+### English
+
+- **Feature Improvements**: Basic functionality optimization and refinement
+
+---
+
 ## v1.0.0 (2026-05-02)
 
-软件第一行代码
+### 中文
+
+- ✅ **初步完成**：软件第一版发布
+
+### English
+
+- **Initial Release**: First version of the application
