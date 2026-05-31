@@ -12,10 +12,12 @@
 ![Version](https://img.shields.io/badge/version-4.1.1-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
+![Bilibili](https://img.shields.io/badge/Bilibili-ZHCOOL520-pink)
+![Email](https://img.shields.io/badge/Email-zhcool520%40foxmail.com-blue)
 
 A powerful Android Automatic Phone Dialing System, supporting batch calling, call audio injection, recording, and more.
 
-**GitHub**: [ZHCOOL520/AUTOcall](https://github.com/ZHCOOL520/AUTOcall)
+**Bilibili**: [ZHCOOL520](https://space.bilibili.com/1414910921) | **Email**: [zhcool520@foxmail.com](mailto:zhcool520@foxmail.com)
 
 ---
 
@@ -223,7 +225,7 @@ MIT License
 ## 🤝 Support & Feedback
 
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/ZHCOOL520/AUTOcall/issues)
-- 📺 **Bilibili**: [ZHCOOL520](https://space.bilibili.com/1414910921)
+- 📧 **Email**: [zhcool520@foxmail.com](mailto:zhcool520@foxmail.com)
 
 Feel free to submit bug reports and feature requests!
 

@@ -12,10 +12,12 @@
 ![Version](https://img.shields.io/badge/version-4.1.1-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
+![Bilibili](https://img.shields.io/badge/Bilibili-ZHCOOL520-pink)
+![Email](https://img.shields.io/badge/Email-zhcool520%40foxmail.com-blue)
 
 一款功能强大的 Android 自动电话拨打系统，支持批量拨号、通话音频注入、录音等功能。
 
-**GitHub**: [ZHCOOL520/AUTOcall](https://github.com/ZHCOOL520/AUTOcall)
+**Bilibili**: [ZHCOOL520](https://space.bilibili.com/1414910921) | **Email**: [zhcool520@foxmail.com](mailto:zhcool520@foxmail.com)
 
 ---
 
@@ -223,7 +225,7 @@ MIT License
 ## 🤝 支持与反馈
 
 - 🐛 **Bug 报告**: [GitHub Issues](https://github.com/ZHCOOL520/AUTOcall/issues)
-- 📺 **Bilibili**: [ZHCOOL520](https://space.bilibili.com/1414910921)
+- 📧 **邮箱**: [zhcool520@foxmail.com](mailto:zhcool520@foxmail.com)
 
 欢迎提交 Bug 报告和功能建议！
 
