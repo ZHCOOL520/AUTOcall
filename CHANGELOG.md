@@ -2,7 +2,7 @@
 
 **Changelog Archive**
 
-![Latest](https://img.shields.io/badge/latest-4.1.1-blue)
+![Latest](https://img.shields.io/badge/latest-4.1.2-blue)
 ![中文](https://img.shields.io/badge/中文-README-green)
 ![English](https://img.shields.io/badge/English-README-purple)
 
@@ -14,7 +14,41 @@
 
 ---
 
+### v4.1.2 (2026-06-03)
+
+| 🇨🇳 中文 | 🇬🇧 English |
+|------|------|
+| ✨ **无障碍服务**：新增无障碍服务辅助拨号功能 | **Accessibility Service**: Added accessibility service for dialing assistance |
+| ✨ **无障碍开关**：设置页面添加无障碍服务开关，支持快速跳转设置 | **Accessibility Toggle**: Added accessibility service toggle in settings with quick access to system settings |
+| 📝 **协议更新**：用户协议更新无障碍权限说明 | **Agreement Update**: Updated user agreement with accessibility permission description |
+| 🔧 **隐私保护**：明确无障碍服务不收集任何用户数据 | **Privacy Protection**: Clarified that accessibility service does not collect any user data |
+
+---
+
 ## v3.x 系列
+
+### v3.2.0 (2026-05-15)
+
+| 🇨🇳 中文 | 🇬🇧 English |
+|------|------|
+| ✨ **自动更新功能**：支持后台下载安装APK，显示下载进度 | **Auto-update Feature**: Background APK download with progress display |
+| ✨ **网络说明**：添加GitHub访问提示和下载页面快捷入口 | **Network Tips**: Added GitHub access tips and download page shortcut |
+| ✨ **首次启动协议优化**：完善用户协议与隐私政策说明 | **First-launch Agreement**: Improved user agreement and privacy policy |
+| ✨ **设置页面增强**：添加功能介绍和隐私政策查看入口 | **Settings Enhancement**: Added feature introduction and privacy policy entry |
+| 🔧 **代码优化**：提取常量、简化导入、优化lambda表达式 | **Code Optimization**: Extracted constants, simplified imports, optimized lambda expressions |
+| 🐛 **安装问题修复**：使用ACTION_INSTALL_PACKAGE并添加降级方案 | **Installation Fix**: Used ACTION_INSTALL_PACKAGE with fallback |
+
+---
+
+### v3.1.2 (2026-05-15)
+
+| 🇨🇳 中文 | 🇬🇧 English |
+|------|------|
+| 🐛 **SIM卡选择修复**：修复SIM卡选择对话框弹出问题，使用SubscriptionManager API | **SIM Card Fix**: Fixed SIM card selection dialog using SubscriptionManager API |
+| 🔧 **权限优化**：添加READ_PHONE_STATE权限检查，提升稳定性 | **Permission Optimization**: Added READ_PHONE_STATE permission check |
+| 🐛 **问题修复**：解决交替模式和指定SIM卡拨打时卡住的问题 | **Bug Fix**: Resolved alternating mode and specified SIM card dialing issues |
+
+---
 
 ### v3.1.1 (2026-05-15)
 

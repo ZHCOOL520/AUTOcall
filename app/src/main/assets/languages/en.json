@@ -168,13 +168,20 @@
     },
     "feature_intro": {
       "title": "📖 Feature Introduction",
-      "features": "• Support Excel/CSV file import for contacts\n• Auto dial and play voice messages\n• Support call recording (requires ROOT)\n• Export call record statistics\n• Support clipboard import for phone numbers\n• Support multiple SIM card selection and dual-SIM alternation\n• Auto check for updates and background download",
+      "features": "• Support Excel/CSV file import for contacts\n• Auto dial and play voice messages\n• Support call recording (requires ROOT)\n• Export call record statistics\n• Support clipboard import for phone numbers\n• Support multiple SIM card selection and dual-SIM alternation\n• Auto check for updates and background download\n• Accessibility service for dialing assistance",
       "view_full_button": "View Full Feature Introduction"
     },
     "privacy_policy": {
       "title": "⚠️ Privacy Policy & Disclaimer",
       "items": "• This software is for learning and research purposes only\n• Strictly prohibited for any illegal purposes\n• Users must bear legal responsibilities themselves",
       "view_button": "View Full Agreement"
+    },
+    "accessibility": {
+      "title": "♿ Accessibility Service",
+      "enabled": "✅ Enabled: Dialing assistance is active",
+      "disabled": "❌ Disabled: Tap to enable accessibility service",
+      "description": "Accessibility service assists auto dialing by monitoring window state to optimize dialing flow",
+      "open_settings": "Open Accessibility Settings"
     }
   },
 
@@ -214,6 +221,10 @@
     "auto_update": {
       "title": "🔄 Auto Update",
       "items": "• Auto check for latest version on startup\n• Download APK files in background\n• Display download progress\n• Auto trigger installation after download completes"
+    },
+    "accessibility": {
+      "title": "♿ Accessibility Service",
+      "items": "• Assist auto dialing functionality\n• Monitor window state to optimize dialing flow\n• Users can enable or disable in settings at any time\n• No personal data is collected or uploaded"
     }
   },
 
@@ -230,11 +241,11 @@
     },
     "permission_notice": {
       "title": "📋 Permission Usage Notice",
-      "items": "• CALL_PHONE: For auto dialing function\n• READ_PHONE_STATE: For monitoring call status and SIM card information\n• RECORD_AUDIO: For call recording function (optional)\n• READ_MEDIA_AUDIO: For reading and playing audio files\n• INTERNET: For checking software updates\n• REQUEST_INSTALL_PACKAGES: For installing updated APK files"
+      "items": "• CALL_PHONE: For auto dialing function\n• READ_PHONE_STATE: For monitoring call status and SIM card information\n• RECORD_AUDIO: For call recording function (optional)\n• READ_MEDIA_AUDIO: For reading and playing audio files\n• INTERNET: For checking software updates\n• REQUEST_INSTALL_PACKAGES: For installing updated APK files\n• BIND_ACCESSIBILITY_SERVICE: For accessibility assistance"
     },
     "privacy_policy": {
       "title": "🔐 Privacy Protection",
-      "items": "• This software will not collect, upload or share any personal information\n• All data is stored only on local devices\n• Contact information, call records and other data are fully controlled by users\n• The software does not contain any advertisements or tracking code"
+      "items": "• This software will not collect, upload or share any personal information\n• All data is stored only on local devices\n• Contact information, call records and other data are fully controlled by users\n• The software does not contain any advertisements or tracking code\n• Accessibility service is only used for dialing assistance, no data is collected"
     },
     "data_privacy": {
       "title": "🛡️ Data Privacy Protection",

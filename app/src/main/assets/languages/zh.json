@@ -168,13 +168,20 @@
     },
     "feature_intro": {
       "title": "📖 功能介绍",
-      "features": "• 支持Excel/CSV文件导入联系人\n• 自动拨打电话并播放语音\n• 支持通话录音（需ROOT）\n• 导出通话记录统计\n• 支持剪贴板导入电话号码\n• 支持多SIM卡选择与双卡交替拨打\n• 自动检查更新与后台下载安装",
+      "features": "• 支持Excel/CSV文件导入联系人\n• 自动拨打电话并播放语音\n• 支持通话录音（需ROOT）\n• 导出通话记录统计\n• 支持剪贴板导入电话号码\n• 支持多SIM卡选择与双卡交替拨打\n• 自动检查更新与后台下载安装\n• 无障碍服务辅助拨号",
       "view_full_button": "查看完整功能介绍"
     },
     "privacy_policy": {
       "title": "⚠️ 隐私政策与免责声明",
       "items": "• 本软件仅供学习研究使用\n• 严禁用于任何非法用途\n• 使用者需自行承担法律责任",
       "view_button": "查看完整协议"
+    },
+    "accessibility": {
+      "title": "♿ 无障碍服务",
+      "enabled": "✅ 开启：辅助拨号功能已激活",
+      "disabled": "❌ 关闭：点击开启无障碍服务",
+      "description": "无障碍服务用于辅助自动拨号，监听窗口状态以优化拨号流程",
+      "open_settings": "前往无障碍设置"
     }
   },
 
@@ -214,6 +221,10 @@
     "auto_update": {
       "title": "🔄 自动更新",
       "items": "• 启动时自动检查最新版本\n• 后台下载APK文件\n• 显示下载进度\n• 下载完成后自动触发安装"
+    },
+    "accessibility": {
+      "title": "♿ 无障碍服务",
+      "items": "• 辅助自动拨号功能\n• 监听窗口状态优化拨号流程\n• 用户可随时在设置中开启或关闭\n• 不收集或上传任何个人数据"
     }
   },
 
@@ -230,11 +241,11 @@
     },
     "permission_notice": {
       "title": "📋 权限使用说明",
-      "items": "• CALL_PHONE：用于自动拨打电话功能\n• READ_PHONE_STATE：用于监听通话状态和SIM卡信息\n• RECORD_AUDIO：用于通话录音功能（可选）\n• READ_MEDIA_AUDIO：用于读取和播放音频文件\n• INTERNET：用于检查软件更新\n• REQUEST_INSTALL_PACKAGES：用于安装更新的APK文件"
+      "items": "• CALL_PHONE：用于自动拨打电话功能\n• READ_PHONE_STATE：用于监听通话状态和SIM卡信息\n• RECORD_AUDIO：用于通话录音功能（可选）\n• READ_MEDIA_AUDIO：用于读取和播放音频文件\n• INTERNET：用于检查软件更新\n• REQUEST_INSTALL_PACKAGES：用于安装更新的APK文件\n• BIND_ACCESSIBILITY_SERVICE：用于无障碍辅助功能"
     },
     "privacy_policy": {
       "title": "🔐 隐私保护",
-      "items": "• 本软件不会收集、上传或分享任何个人信息\n• 所有数据仅存储在本地设备中\n• 联系人信息、通话记录等数据完全由用户控制\n• 软件不包含任何广告或追踪代码"
+      "items": "• 本软件不会收集、上传或分享任何个人信息\n• 所有数据仅存储在本地设备中\n• 联系人信息、通话记录等数据完全由用户控制\n• 软件不包含任何广告或追踪代码\n• 无障碍服务仅用于辅助拨号功能，不收集任何数据"
     },
     "data_privacy": {
       "title": "🛡️ 数据隐私保护",

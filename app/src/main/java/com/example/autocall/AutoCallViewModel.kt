@@ -101,6 +101,10 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _selectedLanguage = MutableStateFlow("zh") // "zh": 中文, "en": English
     val selectedLanguage: StateFlow<String> = _selectedLanguage
 
+    // 无障碍服务相关状态
+    private val _isAccessibilityServiceEnabled = MutableStateFlow(false)
+    val isAccessibilityServiceEnabled: StateFlow<Boolean> = _isAccessibilityServiceEnabled
+
     private val prefs by lazy {
         getApplication<Application>().getSharedPreferences("app_data", Context.MODE_PRIVATE)
     }
@@ -109,6 +113,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         loadData()
         loadUpdateSettings()
         loadLanguageSettings()
+        refreshAccessibilityServiceStatus()
     }
 
     fun toggleSimCardMode() {
@@ -186,6 +191,21 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     fun getLanguageText(): String {
         return LanguageManager.getLanguageDisplayName(_selectedLanguage.value)
+    }
+
+    /**
+     * 刷新无障碍服务状态
+     */
+    fun refreshAccessibilityServiceStatus() {
+        _isAccessibilityServiceEnabled.value = 
+            AutoCallAccessibilityService.isServiceEnabled(getApplication<Application>())
+    }
+
+    /**
+     * 打开无障碍设置页面
+     */
+    fun openAccessibilitySettings() {
+        AutoCallAccessibilityService.openAccessibilitySettings(getApplication<Application>())
     }
 
     private fun saveUpdateSettings() {

@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -605,6 +606,7 @@ fun SettingsScreen(
     val checkUpdateInterval by viewModel.checkUpdateInterval.collectAsState()
     val callInterval by viewModel.callInterval.collectAsState()
     val selectedLanguage by viewModel.selectedLanguage.collectAsState()
+    val isAccessibilityServiceEnabled by viewModel.isAccessibilityServiceEnabled.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
@@ -612,6 +614,22 @@ fun SettingsScreen(
     var showFeatureIntro by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+
+    // 获取生命周期所有者
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+    // 监听生命周期，从设置页面返回时刷新无障碍服务状态
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshAccessibilityServiceStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     // 启动时检查更新
     LaunchedEffect(Unit) {
@@ -722,6 +740,50 @@ fun SettingsScreen(
                 simCardMode = simCardMode,
                 onModeSelected = { mode -> viewModel.setSimCardMode(mode) }
             )
+
+            // 无障碍服务开关
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        viewModel.refreshAccessibilityServiceStatus()
+                        if (!isAccessibilityServiceEnabled) {
+                            viewModel.openAccessibilitySettings()
+                        }
+                    },
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isAccessibilityServiceEnabled) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(LanguageManager.getString("settings_screen.accessibility.title"), fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isAccessibilityServiceEnabled) LanguageManager.getString("settings_screen.accessibility.enabled") 
+                            else LanguageManager.getString("settings_screen.accessibility.disabled"),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            LanguageManager.getString("settings_screen.accessibility.description"),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            ),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    Switch(
+                        checked = isAccessibilityServiceEnabled,
+                        onCheckedChange = {
+                            viewModel.openAccessibilitySettings()
+                        }
+                    )
+                }
+            }
 
             // 拨打间隔设置
             Card(
@@ -1199,6 +1261,22 @@ fun SettingsScreen(
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(LanguageManager.getString("feature_intro_dialog.auto_update.title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                             LanguageManager.getString("feature_intro_dialog.auto_update.items").split("\n").forEach { item ->
+                                if (item.isNotBlank()) {
+                                    Text(item, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(LanguageManager.getString("feature_intro_dialog.accessibility.title"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LanguageManager.getString("feature_intro_dialog.accessibility.items").split("\n").forEach { item ->
                                 if (item.isNotBlank()) {
                                     Text(item, style = MaterialTheme.typography.bodySmall)
                                 }

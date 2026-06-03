@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.autocall"
         minSdk = 26
         targetSdk = 36
-        versionCode = 411
-        versionName = "4.1.1"
+        versionCode = 412
+        versionName = "4.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -57,6 +57,8 @@ dependencies {
     
     // ViewModel for Compose
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // Lifecycle runtime compose for LocalLifecycleOwner
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     // Navigation for Compose
     implementation(libs.androidx.navigation.compose)
     // CSV解析库

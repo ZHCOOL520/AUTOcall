@@ -9,7 +9,7 @@
 >
 > **❗ By downloading, you acknowledge that you have read and agree to the above statements**
 
-![Version](https://img.shields.io/badge/version-4.1.1-blue)
+![Version](https://img.shields.io/badge/version-4.1.2-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
 ![Bilibili](https://img.shields.io/badge/Bilibili-ZHCOOL520-pink)
@@ -22,6 +22,16 @@ A powerful Android Automatic Phone Dialing System, supporting batch calling, cal
 ---
 
 ## ✨ Core Features
+
+> **⚠️ Important Note**
+>
+> 🔴 **Under Development**
+>
+> Due to restrictions in newer Android versions, third-party apps cannot directly call the call audio interface for custom recording.
+>
+> This app requires **Accessibility permission** to automatically click the native recording button on the system call screen.
+>
+> The Accessibility service is **only used to assist recording**, does not collect any user data, and users only need to enable it once. All existing app functions remain completely unaffected.
 
 ### 📞 Batch Dialing
 - ✅ Support for Excel (.xlsx/.xls) and CSV file import
@@ -112,6 +122,27 @@ Tap the **⚙️ Settings** icon in the top-right corner:
 
 ## 🔄 Changelog
 
+### v4.1.2 (2026-06-03) - **Accessibility Service**
+
+- ✨ **Accessibility Service**: Added accessibility service for dialing assistance, monitors window state to optimize dialing flow
+- ✨ **Accessibility Toggle**: Added accessibility service toggle in settings with quick access to system settings
+- 📝 **Agreement Update**: Updated user agreement with accessibility permission description, clarified no user data collection
+- 🔧 **Privacy Protection**: Accessibility service only used for dialing assistance, no personal data collected or uploaded
+
+> **⚠️ Recording Feature Note**
+>
+> 🔴 **Under Development**
+>
+> Due to restrictions in newer Android versions, third-party apps cannot directly call the call audio interface for custom recording.
+>
+> This app requires the Accessibility permission to automatically click the native recording button on the system call screen.
+>
+> **This update (v4.1.2) only adds the Accessibility service configuration; the recording feature itself is not yet implemented**.
+>
+> Users only need to enable the Accessibility service once, and all existing app functions remain completely unaffected.
+
+---
+
 ### v4.1.1 (2026-06-01) - **Bug Fix & Optimization**
 
 - 🐛 **Pause/Resume Fix**: Fixed the issue where resuming after pause would skip the current number (pending verification)
@@ -178,11 +209,6 @@ Tap the **⚙️ Settings** icon in the top-right corner:
 - ✨ **Settings Enhancement**: Added feature introduction and privacy policy entry
 - 🔧 **Code Optimization**: Extracted constants, simplified imports, optimized lambda expressions
 - 🐛 **Installation Fix**: Used ACTION_INSTALL_PACKAGE with fallback
-
-### v3.1.2 (2026-05-15)
-- 🐛 **SIM Card Fix**: Fixed SIM card selection dialog using SubscriptionManager API
-- 🔧 **Permission Optimization**: Added READ_PHONE_STATE permission check
-- 🐛 **Bug Fix**: Resolved alternating mode and specified SIM card dialing issues
 
 ---
 
