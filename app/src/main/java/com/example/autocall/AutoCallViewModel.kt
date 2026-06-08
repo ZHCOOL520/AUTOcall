@@ -105,6 +105,10 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _isAccessibilityServiceEnabled = MutableStateFlow(false)
     val isAccessibilityServiceEnabled: StateFlow<Boolean> = _isAccessibilityServiceEnabled
 
+    // 重复号码标记（用于UI视觉反馈）
+    private val _duplicatePhoneNumbers = MutableStateFlow<Set<String>>(emptySet())
+    val duplicatePhoneNumbers: StateFlow<Set<String>> = _duplicatePhoneNumbers
+
     private val prefs by lazy {
         getApplication<Application>().getSharedPreferences("app_data", Context.MODE_PRIVATE)
     }
@@ -197,8 +201,20 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
      * 刷新无障碍服务状态
      */
     fun refreshAccessibilityServiceStatus() {
+        val previousEnabled = _isAccessibilityServiceEnabled.value
         _isAccessibilityServiceEnabled.value = 
             AutoCallAccessibilityService.isServiceEnabled(getApplication<Application>())
+        
+        // 如果无障碍模式从关闭变为开启，自动关闭录音功能
+        if (!previousEnabled && _isAccessibilityServiceEnabled.value) {
+            if (_isRecordingEnabled.value) {
+                _isRecordingEnabled.value = false
+                _currentStatus.value = LanguageManager.getString("status.recording_disabled")
+                if (audioRecorder?.isRecording() == true) {
+                    audioRecorder?.stopRecording()
+                }
+            }
+        }
     }
 
     /**
@@ -282,6 +298,27 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /**
+     * 按指定选项排序电话列表
+     * @param sortOption 排序选项：0-不排序, 1-号码升序, 2-号码降序, 3-拨打次数升序, 4-拨打次数降序, 5-余额升序, 6-余额降序
+     */
+    fun sortPhoneListByOption(sortOption: Int) {
+        val currentList = _phoneList.value.toMutableList()
+        
+        when (sortOption) {
+            0 -> { /* 不排序，恢复原始顺序 */ }
+            1 -> currentList.sortBy { it.phoneNumber }
+            2 -> currentList.sortByDescending { it.phoneNumber }
+            3 -> currentList.sortBy { it.callCount }
+            4 -> currentList.sortByDescending { it.callCount }
+            5 -> currentList.sortBy { parseBalance(it.balance) }
+            6 -> currentList.sortByDescending { parseBalance(it.balance) }
+        }
+        
+        _phoneList.value = currentList
+        saveData()
+    }
+
     private fun sortPhoneList() {
         val currentList = _phoneList.value.toMutableList()
         
@@ -356,6 +393,36 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     fun clearPhoneList() {
         _phoneList.value = emptyList()
         _currentStatus.value = LanguageManager.getString("status.list_cleared")
+        saveData()
+    }
+
+    /**
+     * 一键整理去重：移除重复号码并按号码排序
+     */
+    fun deduplicateAndSortPhoneList() {
+        val currentList = _phoneList.value
+        if (currentList.isEmpty()) {
+            _currentStatus.value = LanguageManager.getString("status.phone_list_empty")
+            return
+        }
+
+        val originalSize = currentList.size
+        
+        // 去重：保留第一个出现的号码，移除后续重复项
+        val uniqueList = currentList.distinctBy { it.phoneNumber }
+        
+        // 按号码升序排序
+        val sortedList = uniqueList.sortedBy { it.phoneNumber }
+        
+        val removedCount = originalSize - sortedList.size
+        
+        _phoneList.value = sortedList
+        
+        _currentStatus.value = if (removedCount > 0) {
+            LanguageManager.getString("status.deduplicate_success", removedCount)
+        } else {
+            LanguageManager.getString("status.deduplicate_no_duplicates")
+        }
         saveData()
     }
 
@@ -580,6 +647,132 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.import_failed", e.message ?: "") }
             }
         }
+    }
+
+    /**
+     * 从文本输入中识别并导入电话号码
+     * @param context 上下文
+     * @param text 包含电话号码的文本
+     */
+    fun importFromTextInput(context: Context, text: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (text.isBlank()) {
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.text_input_empty") }
+                    return@launch
+                }
+
+                // 显示正在识别状态
+                withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.text_input_recognizing") }
+
+                // 收集所有识别到的手机号（包括重复的）
+                val allRecognizedPhones = mutableListOf<String>()
+
+                // 第一步：使用正则表达式直接提取所有可能的11位手机号
+                val phonePattern = Regex("(?:^|[\\s,;，；|\\n\\r])(1[3-9]\\d{9})(?:$|[\\s,;，；|\\n\\r])")
+                val matches = phonePattern.findAll(text)
+
+                for (match in matches) {
+                    val phone = match.groupValues[1]
+                    if (phone.isNotEmpty()) {
+                        allRecognizedPhones.add(phone)
+                    }
+                }
+
+                // 第二步：如果上面的模式没有匹配到，尝试更宽松的提取方式
+                if (allRecognizedPhones.isEmpty()) {
+                    val separators = Regex("[,;，；|\\n\\r]+")
+                    val segments = text.split(separators)
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+
+                    for (segment in segments) {
+                        val phone = extractPhoneNumber(segment)
+                        if (!phone.isNullOrEmpty()) {
+                            allRecognizedPhones.add(phone)
+                        }
+                    }
+                }
+
+                if (allRecognizedPhones.isEmpty()) {
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.text_input_no_phone") }
+                    return@launch
+                }
+
+                // 第三步：严格去重处理
+                // 1. 对识别结果本身去重
+                val uniquePhones = allRecognizedPhones.distinct()
+                val duplicateInInput = allRecognizedPhones.size - uniquePhones.size
+
+                // 2. 与现有列表去重，找出需要新增的号码
+                val existingPhones = _phoneList.value.map { it.phoneNumber }.toSet()
+                val newPhones = uniquePhones.filter { it !in existingPhones }
+                val duplicateWithExisting = uniquePhones.size - newPhones.size
+
+                // 计算总重复数
+                val totalDuplicates = duplicateInInput + duplicateWithExisting
+
+                if (newPhones.isEmpty()) {
+                    // 所有号码都已存在于列表中
+                    withContext(Dispatchers.Main) {
+                        // 设置重复号码标记（用于UI视觉反馈）
+                        if (totalDuplicates > 0) {
+                            val duplicatesInText = allRecognizedPhones.groupBy { it }
+                                .filter { it.value.size > 1 }
+                                .keys
+                            val duplicatesWithExisting = uniquePhones.filter { it in existingPhones }
+                            _duplicatePhoneNumbers.value = (duplicatesInText + duplicatesWithExisting).toSet()
+                        }
+                        _currentStatus.value = if (totalDuplicates > 0) {
+                            LanguageManager.getString("status.text_input_all_duplicates", uniquePhones.size, totalDuplicates)
+                        } else {
+                            LanguageManager.getString("status.text_input_no_phone")
+                        }
+                    }
+                    return@launch
+                }
+
+                // 第四步：导入新的唯一号码
+                val phoneListToAdd = newPhones.map { PhoneEntry(phoneNumber = it) }
+
+                withContext(Dispatchers.Main) {
+                    // 追加到现有列表，而不是替换
+                    val currentList = _phoneList.value.toMutableList()
+                    currentList.addAll(phoneListToAdd)
+                    _phoneList.value = currentList
+
+                    // 设置重复号码标记（用于UI视觉反馈）
+                    if (totalDuplicates > 0) {
+                        // 收集所有重复的号码：文本内重复 + 与现有列表重复
+                        val duplicatesInText = allRecognizedPhones.groupBy { it }
+                            .filter { it.value.size > 1 }
+                            .keys
+                        val duplicatesWithExisting = uniquePhones.filter { it in existingPhones }
+                        _duplicatePhoneNumbers.value = (duplicatesInText + duplicatesWithExisting).toSet()
+                    } else {
+                        _duplicatePhoneNumbers.value = emptySet()
+                    }
+
+                    // 根据是否有重复，显示不同的状态提示
+                    _currentStatus.value = if (totalDuplicates > 0) {
+                        LanguageManager.getString("status.text_input_success_with_duplicates", phoneListToAdd.size, totalDuplicates)
+                    } else {
+                        LanguageManager.getString("status.text_input_success", phoneListToAdd.size)
+                    }
+                    saveData()
+                }
+            } catch (e: Exception) {
+                Log.e(tag, LanguageManager.getString("log.text_input_import_failed", e.message ?: ""))
+                withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.import_failed", e.message ?: "") }
+            }
+        }
+    }
+
+    /**
+     * 清除重复号码标记（UI调用后标记消失）
+     */
+    fun clearDuplicatePhoneNumbers() {
+        _duplicatePhoneNumbers.value = emptySet()
     }
 
     private fun detectColumnHeaders(row: Row): Map<String, Int> {

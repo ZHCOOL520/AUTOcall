@@ -9,7 +9,7 @@
 >
 > **❗ By downloading, you acknowledge that you have read and agree to the above statements**
 
-![Version](https://img.shields.io/badge/version-4.1.2-blue)
+![Version](https://img.shields.io/badge/version-4.1.3-blue)
 ![Android](https://img.shields.io/badge/Android-9%2B-green)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple)
 ![Bilibili](https://img.shields.io/badge/Bilibili-ZHCOOL520-pink)
@@ -122,6 +122,18 @@ Tap the **⚙️ Settings** icon in the top-right corner:
 
 ## 🔄 Changelog
 
+### v4.1.3 (2026-06-08) - **Accessibility Mode Refactor & Smart Deduplication**
+
+- ♻️ **Feature Renaming**: Unified renaming of "Accessibility Service" to "Accessibility Mode", all user-visible text dynamically retrieved via LanguageManager
+- ⚙️ **Core Logic Enhancement**: Automatically disable recording when enabling Accessibility Mode, recording state remains unchanged when disabling mode
+- 🎨 **UI Layout Optimization**: Merged recording toggle and Accessibility Mode toggle into the same settings area, added description text explaining linkage
+- 🌐 **i18n Improvements**: Added mode-related log strings, updated Chinese and English language files
+- 🐛 **Clipboard Format Fix**: Optimized clipboard content parsing, fixed phone number recognition issues with special formats
+- ⚡ **Phone List Sorting Optimization**: Added multiple sorting methods (phone number, balance, call count) with ascending/descending toggle
+- ✨ **One-Click Deduplication**: Added deduplication button to automatically remove duplicate numbers and sort by phone number
+
+---
+
 ### v4.1.2 (2026-06-03) - **Accessibility Service**
 
 - ✨ **Accessibility Service**: Added accessibility service for dialing assistance, monitors window state to optimize dialing flow
@@ -199,16 +211,6 @@ Tap the **⚙️ Settings** icon in the top-right corner:
 - 🔒 **Number Validation**: Strict validation for Chinese mobile phone format (11-digit starting with 1), preventing non-number fields from being dialed
 - 🧹 **Code Quality**: Cleaned up unused functions, eliminated compiler warnings, optimized GlobalScope usage
 - 🛡️ **Security Enhancement**: Fixed unsafe type conversions, added AudioManager and ClipboardManager null pointer checks
-
----
-
-### v3.2.0 (2026-05-15)
-- ✨ **Auto-update Feature**: Background APK download with progress display
-- ✨ **Network Tips**: Added GitHub access tips and download page shortcut
-- ✨ **First-launch Agreement**: Improved user agreement and privacy policy
-- ✨ **Settings Enhancement**: Added feature introduction and privacy policy entry
-- 🔧 **Code Optimization**: Extracted constants, simplified imports, optimized lambda expressions
-- 🐛 **Installation Fix**: Used ACTION_INSTALL_PACKAGE with fallback
 
 ---
 

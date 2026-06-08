@@ -23,6 +23,15 @@
       "balance_desc": "✓ 余额降序"
     },
     "clear_list": "🗑️ 清空",
+    "deduplicate_button": "🔄 一键整理去重",
+    "sort_dialog_title": "选择排序方式",
+    "sort_option_none": "不排序",
+    "sort_option_phone_asc": "号码升序",
+    "sort_option_phone_desc": "号码降序",
+    "sort_option_call_count_asc": "拨打次数升序",
+    "sort_option_call_count_desc": "拨打次数降序",
+    "sort_option_balance_asc": "余额升序",
+    "sort_option_balance_desc": "余额降序",
     "confirm_clear": {
       "title": "确认清空",
       "message": "确定要清空所有联系人吗？此操作不可恢复。",
@@ -34,6 +43,9 @@
     "import_phone": "导入电话",
     "import_clipboard": "📋 从剪贴板导入号码",
     "clipboard_hint": "支持复制多个号码，自动识别空格、横杠、逗号等格式",
+    "import_text": "📝 从文本识别导入号码",
+    "text_input_hint": "粘贴包含电话号码的文本",
+    "text_input_recognize": "识别并导入",
     "start_call": "开始拨打",
     "pause": "暂停",
     "resume": "继续",
@@ -49,7 +61,8 @@
     "called": "✓ 已拨打 (%d次)",
     "not_called": "○ 未拨打",
     "account_number": "户号: %s",
-    "balance": "余额: %s"
+    "balance": "余额: %s",
+    "duplicate": "重复"
   },
 
   "status_card": {
@@ -176,12 +189,18 @@
       "items": "• 本软件仅供学习研究使用\n• 严禁用于任何非法用途\n• 使用者需自行承担法律责任",
       "view_button": "查看完整协议"
     },
+    "combined_mode": {
+      "description": "开启此模式后将自动使用系统录音，并关闭应用内录音"
+    },
     "accessibility": {
-      "title": "♿ 无障碍服务",
+      "title": "♿ 无障碍模式",
       "enabled": "✅ 开启：辅助拨号功能已激活",
-      "disabled": "❌ 关闭：点击开启无障碍服务",
-      "description": "无障碍服务用于辅助自动拨号，监听窗口状态以优化拨号流程",
-      "open_settings": "前往无障碍设置"
+      "disabled": "❌ 关闭：点击开启无障碍模式",
+      "description": "无障碍模式用于辅助自动拨号，监听窗口状态以优化拨号流程",
+      "open_settings": "前往无障碍模式设置",
+      "service_connected": "无障碍模式已连接",
+      "service_interrupted": "无障碍模式被中断",
+      "service_destroyed": "无障碍模式已销毁"
     }
   },
 
@@ -223,7 +242,7 @@
       "items": "• 启动时自动检查最新版本\n• 后台下载APK文件\n• 显示下载进度\n• 下载完成后自动触发安装"
     },
     "accessibility": {
-      "title": "♿ 无障碍服务",
+      "title": "♿ 无障碍模式",
       "items": "• 辅助自动拨号功能\n• 监听窗口状态优化拨号流程\n• 用户可随时在设置中开启或关闭\n• 不收集或上传任何个人数据"
     }
   },
@@ -280,6 +299,8 @@
     "sort_call_count_asc": "已按拨打次数从小到大排序",
     "sort_call_count_desc": "已按拨打次数从大到小排序",
     "list_cleared": "列表已清空",
+    "deduplicate_success": "整理完成，移除了 %d 个重复号码",
+    "deduplicate_no_duplicates": "整理完成，没有发现重复号码",
     "excel_not_found": "Excel文件不存在",
     "csv_not_found": "CSV文件不存在",
     "csv_empty": "CSV文件为空",
@@ -289,6 +310,12 @@
     "clipboard_no_phone": "未在剪贴板中找到有效电话号码",
     "clipboard_import_success": "从剪贴板导入 %d 个电话",
     "clipboard_service_unavailable": "无法获取剪贴板服务",
+    "text_input_empty": "文本输入内容为空",
+    "text_input_no_phone": "未在文本中找到有效电话号码",
+    "text_input_success": "从文本识别导入 %d 个电话",
+    "text_input_success_with_duplicates": "从文本识别导入 %d 个电话（已过滤 %d 个重复号码）",
+    "text_input_all_duplicates": "识别出 %d 个号码，但全部重复（%d 个重复），无需导入",
+    "text_input_recognizing": "正在识别...",
     "audio_format_unsupported": "不支持的音频格式",
     "audio_import_success": "音频导入成功: %s",
     "audio_import_failed": "导入音频失败: %s",
@@ -332,6 +359,7 @@
     "import_csv_failed": "导入CSV失败: %s",
     "import_file_failed": "导入文件失败: %s",
     "clipboard_import_failed": "从剪贴板导入失败: %s",
+    "text_input_import_failed": "从文本导入失败: %s",
     "invalid_number": "忽略无效号码: '%s' -> 清理后: '%s' (不符合中国大陆手机号格式)",
     "audio_import_failed": "导入音频失败: %s",
     "start_dial_index": "开始拨打索引=%d, 号码=%s",

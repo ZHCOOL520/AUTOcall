@@ -23,6 +23,15 @@
       "balance_desc": "✓ Balance Descending"
     },
     "clear_list": "🗑️ Clear",
+    "deduplicate_button": "🔄 Deduplicate & Sort",
+    "sort_dialog_title": "Select Sort Method",
+    "sort_option_none": "No Sort",
+    "sort_option_phone_asc": "Phone Number Ascending",
+    "sort_option_phone_desc": "Phone Number Descending",
+    "sort_option_call_count_asc": "Call Count Ascending",
+    "sort_option_call_count_desc": "Call Count Descending",
+    "sort_option_balance_asc": "Balance Ascending",
+    "sort_option_balance_desc": "Balance Descending",
     "confirm_clear": {
       "title": "Confirm Clear",
       "message": "Are you sure you want to clear all contacts? This action cannot be undone.",
@@ -34,6 +43,9 @@
     "import_phone": "Import Phone",
     "import_clipboard": "📋 Import from Clipboard",
     "clipboard_hint": "Supports multiple numbers, auto-detects spaces, dashes, commas, etc.",
+    "import_text": "📝 Import from Text Recognition",
+    "text_input_hint": "Paste text containing phone numbers",
+    "text_input_recognize": "Recognize & Import",
     "start_call": "Start Calling",
     "pause": "Pause",
     "resume": "Resume",
@@ -49,7 +61,8 @@
     "called": "✓ Called (%d times)",
     "not_called": "○ Not Called",
     "account_number": "Account: %s",
-    "balance": "Balance: %s"
+    "balance": "Balance: %s",
+    "duplicate": "Duplicate"
   },
 
   "status_card": {
@@ -176,12 +189,18 @@
       "items": "• This software is for learning and research purposes only\n• Strictly prohibited for any illegal purposes\n• Users must bear legal responsibilities themselves",
       "view_button": "View Full Agreement"
     },
+    "combined_mode": {
+      "description": "Enabling this mode will automatically use system recording and disable app recording"
+    },
     "accessibility": {
-      "title": "♿ Accessibility Service",
+      "title": "♿ Accessibility Mode",
       "enabled": "✅ Enabled: Dialing assistance is active",
-      "disabled": "❌ Disabled: Tap to enable accessibility service",
-      "description": "Accessibility service assists auto dialing by monitoring window state to optimize dialing flow",
-      "open_settings": "Open Accessibility Settings"
+      "disabled": "❌ Disabled: Tap to enable accessibility mode",
+      "description": "Accessibility mode assists auto dialing by monitoring window state to optimize dialing flow",
+      "open_settings": "Open Accessibility Mode Settings",
+      "service_connected": "Accessibility mode connected",
+      "service_interrupted": "Accessibility mode interrupted",
+      "service_destroyed": "Accessibility mode destroyed"
     }
   },
 
@@ -223,7 +242,7 @@
       "items": "• Auto check for latest version on startup\n• Download APK files in background\n• Display download progress\n• Auto trigger installation after download completes"
     },
     "accessibility": {
-      "title": "♿ Accessibility Service",
+      "title": "♿ Accessibility Mode",
       "items": "• Assist auto dialing functionality\n• Monitor window state to optimize dialing flow\n• Users can enable or disable in settings at any time\n• No personal data is collected or uploaded"
     }
   },
@@ -280,6 +299,8 @@
     "sort_call_count_asc": "Sorted by call count (ascending)",
     "sort_call_count_desc": "Sorted by call count (descending)",
     "list_cleared": "List cleared",
+    "deduplicate_success": "Deduplication completed, removed %d duplicate numbers",
+    "deduplicate_no_duplicates": "Deduplication completed, no duplicate numbers found",
     "excel_not_found": "Excel file not found",
     "csv_not_found": "CSV file not found",
     "csv_empty": "CSV file is empty",
@@ -289,6 +310,12 @@
     "clipboard_no_phone": "No valid phone numbers found in clipboard",
     "clipboard_import_success": "Imported %d phone numbers from clipboard",
     "clipboard_service_unavailable": "Clipboard service unavailable",
+    "text_input_empty": "Text input is empty",
+    "text_input_no_phone": "No valid phone numbers found in text",
+    "text_input_success": "Imported %d phone numbers from text",
+    "text_input_success_with_duplicates": "Imported %d phone numbers from text (%d duplicates filtered)",
+    "text_input_all_duplicates": "Found %d numbers, but all are duplicates (%d duplicates), no import needed",
+    "text_input_recognizing": "Recognizing...",
     "audio_format_unsupported": "Unsupported audio format",
     "audio_import_success": "Audio imported successfully: %s",
     "audio_import_failed": "Audio import failed: %s",
@@ -332,6 +359,7 @@
     "import_csv_failed": "Failed to import CSV: %s",
     "import_file_failed": "Failed to import file: %s",
     "clipboard_import_failed": "Failed to import from clipboard: %s",
+    "text_input_import_failed": "Failed to import from text: %s",
     "invalid_number": "Ignored invalid number: '%s' -> cleaned: '%s' (does not match China mobile format)",
     "audio_import_failed": "Failed to import audio: %s",
     "start_dial_index": "Starting dial index=%d, number=%s",

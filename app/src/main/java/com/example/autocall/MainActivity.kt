@@ -267,6 +267,8 @@ fun MainScreen(
     val isPaused by viewModel.isPaused.collectAsState()
     // 关键修复：监听语言状态变化，触发UI重组
     val selectedLanguage by viewModel.selectedLanguage.collectAsState()
+    // 监听重复号码标记
+    val duplicatePhoneNumbers by viewModel.duplicatePhoneNumbers.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
@@ -347,34 +349,27 @@ fun MainScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 拨打次数排序按钮
-                    val callCountSortText = when (sortByCallCount) {
-                        0 -> LanguageManager.getString("main_screen.sort.call_count")
-                        1 -> LanguageManager.getString("main_screen.sort.call_count_asc")
-                        2 -> LanguageManager.getString("main_screen.sort.call_count_desc")
-                        else -> LanguageManager.getString("main_screen.sort.call_count")
-                    }
-                    FilterChip(
-                        selected = sortByCallCount != 0,
-                        onClick = { viewModel.toggleSortByCallCount() },
-                        label = { Text(callCountSortText, style = MaterialTheme.typography.bodySmall) },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    // 余额排序按钮
-                    if (phoneList.any { !it.balance.isNullOrEmpty() }) {
-                        val sortText = when (sortByBalance) {
-                            0 -> LanguageManager.getString("main_screen.sort.balance")
-                            1 -> LanguageManager.getString("main_screen.sort.balance_asc")
-                            2 -> LanguageManager.getString("main_screen.sort.balance_desc")
-                            else -> LanguageManager.getString("main_screen.sort.balance")
+                    // 排序对话框按钮
+                    if (phoneList.isNotEmpty()) {
+                        var showSortDialog by remember { mutableStateOf(false) }
+                        
+                        OutlinedButton(
+                            onClick = { showSortDialog = true },
+                            modifier = Modifier.weight(1f),
+                            enabled = !isRunning
+                        ) {
+                            Text(LanguageManager.getString("main_screen.sort_dialog_title"), style = MaterialTheme.typography.bodySmall)
                         }
-                        FilterChip(
-                            selected = sortByBalance != 0,
-                            onClick = { viewModel.toggleSortByBalance() },
-                            label = { Text(sortText, style = MaterialTheme.typography.bodySmall) },
-                            modifier = Modifier.weight(1f)
-                        )
+                        
+                        if (showSortDialog) {
+                            SortDialog(
+                                onDismiss = { showSortDialog = false },
+                                onSortSelected = { sortOption ->
+                                    viewModel.sortPhoneListByOption(sortOption)
+                                    showSortDialog = false
+                                }
+                            )
+                        }
                     }
                     
                     // 清空列表按钮
@@ -419,8 +414,20 @@ fun MainScreen(
                     }
                 }
 
+                // 一键整理去重按钮
+                if (phoneList.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = { viewModel.deduplicateAndSortPhoneList() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isRunning
+                    ) {
+                        Text(LanguageManager.getString("main_screen.deduplicate_button"))
+                    }
+                }
+
                 PhoneList(
                     phoneList = phoneList,
+                    duplicatePhoneNumbers = duplicatePhoneNumbers,
                     onPhoneClick = { entry ->
                         viewModel.markAsCalledManually(entry.phoneNumber)
                         val intent = Intent(Intent.ACTION_CALL).apply {
@@ -428,7 +435,8 @@ fun MainScreen(
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         context.startActivity(intent)
-                    }
+                    },
+                    onDuplicateMarkCleared = { viewModel.clearDuplicatePhoneNumbers() }
                 )
 
                 if (statistics.isNotEmpty()) {
@@ -702,35 +710,76 @@ fun SettingsScreen(
                 )
             }
 
-            // 通话录音开关
+            // 录音与无障碍模式设置
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isRecordingEnabled) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(LanguageManager.getString("settings_screen.call_recording.title"), fontWeight = FontWeight.Bold)
-                        Text(
-                            if (isRecordingEnabled) LanguageManager.getString("settings_screen.call_recording.enabled") else LanguageManager.getString("settings_screen.call_recording.disabled"),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        if (isRecordingEnabled) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // 录音开关
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(LanguageManager.getString("settings_screen.call_recording.title"), fontWeight = FontWeight.Bold)
                             Text(
-                                LanguageManager.getString("settings_screen.call_recording.status", currentStatus),
-                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary)
+                                if (isRecordingEnabled) LanguageManager.getString("settings_screen.call_recording.enabled") else LanguageManager.getString("settings_screen.call_recording.disabled"),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            if (isRecordingEnabled) {
+                                Text(
+                                    LanguageManager.getString("settings_screen.call_recording.status", currentStatus),
+                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary)
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = isRecordingEnabled,
+                            onCheckedChange = { viewModel.toggleRecording() }
+                        )
+                    }
+                    
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    
+                    // 无障碍模式开关
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(LanguageManager.getString("settings_screen.accessibility.title"), fontWeight = FontWeight.Bold)
+                            Text(
+                                if (isAccessibilityServiceEnabled) LanguageManager.getString("settings_screen.accessibility.enabled") 
+                                else LanguageManager.getString("settings_screen.accessibility.disabled"),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                LanguageManager.getString("settings_screen.accessibility.description"),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                ),
+                                modifier = Modifier.padding(top = 4.dp)
                             )
                         }
+                        Switch(
+                            checked = isAccessibilityServiceEnabled,
+                            onCheckedChange = {
+                                viewModel.openAccessibilitySettings()
+                            }
+                        )
                     }
-                    Switch(
-                        checked = isRecordingEnabled,
-                        onCheckedChange = { viewModel.toggleRecording() }
+                    
+                    // 描述文本
+                    Text(
+                        LanguageManager.getString("settings_screen.combined_mode.description"),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
                     )
                 }
             }
@@ -740,50 +789,6 @@ fun SettingsScreen(
                 simCardMode = simCardMode,
                 onModeSelected = { mode -> viewModel.setSimCardMode(mode) }
             )
-
-            // 无障碍服务开关
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        viewModel.refreshAccessibilityServiceStatus()
-                        if (!isAccessibilityServiceEnabled) {
-                            viewModel.openAccessibilitySettings()
-                        }
-                    },
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isAccessibilityServiceEnabled) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(LanguageManager.getString("settings_screen.accessibility.title"), fontWeight = FontWeight.Bold)
-                        Text(
-                            if (isAccessibilityServiceEnabled) LanguageManager.getString("settings_screen.accessibility.enabled") 
-                            else LanguageManager.getString("settings_screen.accessibility.disabled"),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            LanguageManager.getString("settings_screen.accessibility.description"),
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            ),
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                    Switch(
-                        checked = isAccessibilityServiceEnabled,
-                        onCheckedChange = {
-                            viewModel.openAccessibilitySettings()
-                        }
-                    )
-                }
-            }
 
             // 拨打间隔设置
             Card(
@@ -1759,7 +1764,20 @@ fun ControlButtons(
 }
 
 @Composable
-fun PhoneList(phoneList: List<PhoneEntry>, onPhoneClick: (PhoneEntry) -> Unit = {}) {
+fun PhoneList(
+    phoneList: List<PhoneEntry>,
+    duplicatePhoneNumbers: Set<String> = emptySet(),
+    onPhoneClick: (PhoneEntry) -> Unit = {},
+    onDuplicateMarkCleared: () -> Unit = {}
+) {
+    // 延迟清除重复标记（5秒后自动消失）
+    LaunchedEffect(duplicatePhoneNumbers) {
+        if (duplicatePhoneNumbers.isNotEmpty()) {
+            kotlinx.coroutines.delay(5000L)
+            onDuplicateMarkCleared()
+        }
+    }
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -1775,7 +1793,12 @@ fun PhoneList(phoneList: List<PhoneEntry>, onPhoneClick: (PhoneEntry) -> Unit = 
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(phoneList) { entry ->
-                    PhoneItem(entry, onClick = { onPhoneClick(entry) })
+                    val isDuplicate = entry.phoneNumber in duplicatePhoneNumbers
+                    PhoneItem(
+                        entry = entry,
+                        isDuplicate = isDuplicate,
+                        onClick = { onPhoneClick(entry) }
+                    )
                 }
             }
         }
@@ -1783,14 +1806,15 @@ fun PhoneList(phoneList: List<PhoneEntry>, onPhoneClick: (PhoneEntry) -> Unit = 
 }
 
 @Composable
-fun PhoneItem(entry: PhoneEntry, onClick: () -> Unit = {}) {
+fun PhoneItem(entry: PhoneEntry, isDuplicate: Boolean = false, onClick: () -> Unit = {}) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (entry.isCalled) 
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            else 
-                MaterialTheme.colorScheme.surface
+            containerColor = when {
+                isDuplicate -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                entry.isCalled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                else -> MaterialTheme.colorScheme.surface
+            }
         )
     ) {
         Row(
@@ -1799,22 +1823,43 @@ fun PhoneItem(entry: PhoneEntry, onClick: () -> Unit = {}) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    entry.contactName.ifEmpty { LanguageManager.getString("phone_item.unknown_contact") },
-                    style = MaterialTheme.typography.titleSmall, 
-                    fontWeight = FontWeight.Bold,
-                    color = if (entry.isCalled) 
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    else 
-                        MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        entry.contactName.ifEmpty { LanguageManager.getString("phone_item.unknown_contact") },
+                        style = MaterialTheme.typography.titleSmall, 
+                        fontWeight = FontWeight.Bold,
+                        color = if (entry.isCalled) 
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        else 
+                            MaterialTheme.colorScheme.onSurface
+                    )
+                    // 重复标记标签
+                    if (isDuplicate) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Text(
+                                text = LanguageManager.getString("phone_item.duplicate"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onError,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 Text(
                     entry.phoneNumber,
                     style = MaterialTheme.typography.bodyMedium, 
-                    color = if (entry.isCalled) 
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    else 
-                        MaterialTheme.colorScheme.primary
+                    color = when {
+                        isDuplicate -> MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                        entry.isCalled -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        else -> MaterialTheme.colorScheme.primary
+                    }
                 )
                 
                 // 显示拨打状态
@@ -1854,6 +1899,44 @@ fun PhoneItem(entry: PhoneEntry, onClick: () -> Unit = {}) {
             }
         }
     }
+}
+
+@Composable
+fun SortDialog(
+    onDismiss: () -> Unit,
+    onSortSelected: (Int) -> Unit
+) {
+    val sortOptions = listOf(
+        LanguageManager.getString("main_screen.sort_option_none"),
+        LanguageManager.getString("main_screen.sort_option_phone_asc"),
+        LanguageManager.getString("main_screen.sort_option_phone_desc"),
+        LanguageManager.getString("main_screen.sort_option_call_count_asc"),
+        LanguageManager.getString("main_screen.sort_option_call_count_desc"),
+        LanguageManager.getString("main_screen.sort_option_balance_asc"),
+        LanguageManager.getString("main_screen.sort_option_balance_desc")
+    )
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(LanguageManager.getString("main_screen.sort_dialog_title")) },
+        text = {
+            Column {
+                sortOptions.forEachIndexed { index, option ->
+                    TextButton(
+                        onClick = { onSortSelected(index) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(option, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(LanguageManager.getString("common.cancel"))
+            }
+        }
+    )
 }
 
 // 获取应用版本号

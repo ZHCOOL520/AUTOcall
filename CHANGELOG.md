@@ -2,7 +2,7 @@
 
 **Changelog Archive**
 
-![Latest](https://img.shields.io/badge/latest-4.1.2-blue)
+![Latest](https://img.shields.io/badge/latest-4.1.3-blue)
 ![中文](https://img.shields.io/badge/中文-README-green)
 ![English](https://img.shields.io/badge/English-README-purple)
 
@@ -11,6 +11,20 @@
 > 本文档记录了 AUTOcall 项目的早期版本更新历史。
 >
 > 最近 5 个版本的更新日志请参阅 [README.md](README.md)（中文）或 [README_EN.md](README_EN.md)（英文）。
+
+---
+
+### v4.1.3 (2026-06-08)
+
+| 🇨🇳 中文 | 🇬🇧 English |
+|------|------|
+| ♻️ **功能重命名**：将“无障碍服务”统一更名为“无障碍模式” | **Feature Renaming**: Unified renaming of "Accessibility Service" to "Accessibility Mode" |
+| ⚙️ **核心逻辑改造**：开启无障碍模式时自动关闭录音功能 | **Core Logic Enhancement**: Automatically disable recording when enabling Accessibility Mode |
+| 🎨 **UI布局优化**：将录音开关与无障碍模式开关合并到同一设置区域 | **UI Layout Optimization**: Merged recording toggle and Accessibility Mode toggle into the same settings area |
+| 🌐 **国际化完善**：新增模式相关日志字符串，更新中英文语言文件 | **i18n Improvements**: Added mode-related log strings, updated Chinese and English language files |
+| 🐛 **剪贴板格式识别修复**：优化剪贴板内容解析，修复特殊格式下无法正确识别电话号码的问题 | **Clipboard Format Fix**: Optimized clipboard content parsing, fixed phone number recognition issues with special formats |
+| ⚡ **电话列表排序优化**：新增多种排序方式（号码、余额、拨打次数），支持升降序切换 | **Phone List Sorting Optimization**: Added multiple sorting methods (phone number, balance, call count) with ascending/descending toggle |
+| ✨ **一键去重功能**：添加一键整理去重按钮，自动移除重复号码并按号码排序 | **One-Click Deduplication**: Added deduplication button to automatically remove duplicate numbers and sort by phone number |
 
 ---
 
