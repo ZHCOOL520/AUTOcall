@@ -145,6 +145,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     init {
         loadData()
+        loadRuntimeSettings()
         loadUpdateSettings()
         loadLanguageSettings()
         loadAccessibilitySettings()
@@ -333,20 +334,9 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
      * 刷新无障碍服务状态
      */
     fun refreshAccessibilityServiceStatus() {
-        val previousEnabled = _isAccessibilityServiceEnabled.value
-        _isAccessibilityServiceEnabled.value = 
+        _isAccessibilityServiceEnabled.value =
             AutoCallAccessibilityService.isServiceEnabled(getApplication<Application>())
-        
-        // 如果无障碍模式从关闭变为开启，自动关闭录音功能
-        if (!previousEnabled && _isAccessibilityServiceEnabled.value) {
-            if (_isRecordingEnabled.value) {
-                _isRecordingEnabled.value = false
-                _currentStatus.value = LanguageManager.getString("status.recording_disabled")
-                if (audioRecorder?.isRecording() == true) {
-                    audioRecorder?.stopRecording()
-                }
-            }
-        }
+        // ★ 修 B1：不再因开启无障碍而强制关闭录音 —— 无障碍恰是高版本唯一可用的录音途径。
     }
 
     /**
@@ -354,6 +344,25 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
      */
     fun openAccessibilitySettings() {
         AutoCallAccessibilityService.openAccessibilitySettings(getApplication<Application>())
+    }
+
+    // ★ 修 B7：关键运行开关持久化，避免重启 App 后录音/播放开关与选中音频回退默认值
+    private fun saveRuntimeSettings() {
+        prefs.edit()
+            .putBoolean("recording_enabled", _isRecordingEnabled.value)
+            .putBoolean("audio_playback_enabled", _isAudioPlaybackEnabled.value)
+            .putInt("selected_audio_index", _selectedAudioIndex.value)
+            .putString("user_audios", Gson().toJson(_userAudios.value))
+            .apply()
+    }
+
+    private fun loadRuntimeSettings() {
+        _isRecordingEnabled.value = prefs.getBoolean("recording_enabled", false)
+        _isAudioPlaybackEnabled.value = prefs.getBoolean("audio_playback_enabled", false)
+        _selectedAudioIndex.value = prefs.getInt("selected_audio_index", 0)
+        val type = object : TypeToken<List<String>>() {}.type
+        _userAudios.value = Gson().fromJson<List<String>>(prefs.getString("user_audios", null), type)
+            ?: emptyList()
     }
 
     private fun saveUpdateSettings() {
@@ -386,6 +395,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 audioRecorder?.stopRecording()
             }
         }
+        saveRuntimeSettings()
     }
 
     fun toggleAudioPlayback() {
@@ -396,6 +406,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         } else {
             _currentStatus.value = LanguageManager.getString("status.audio_playback_disabled")
         }
+        saveRuntimeSettings()
     }
 
     fun setCallInterval(seconds: Int) {
@@ -593,7 +604,10 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     fun selectAudio(index: Int) {
         val all = getAllAudios()
-        if (index in all.indices) _selectedAudioIndex.value = index
+        if (index in all.indices) {
+            _selectedAudioIndex.value = index
+            saveRuntimeSettings()
+        }
     }
 
     fun getCurrentAudioName(): String {
@@ -1062,6 +1076,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 withContext(Dispatchers.Main) {
                     _selectedAudioIndex.value = newIndex
                     _currentStatus.value = LanguageManager.getString("status.audio_import_success", destFile.name)
+                    saveRuntimeSettings()
                 }
             } catch (e: Exception) {
                 Log.e(tag, LanguageManager.getString("log.audio_import_failed", e.message ?: ""))
