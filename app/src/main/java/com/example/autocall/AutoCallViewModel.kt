@@ -82,6 +82,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     @Volatile private var currentProcessingIndex: Int = -1 // 当前正在处理的索引（原子性保护）
     @Volatile private var isCallInProgress: Boolean = false // 是否有通话正在进行
+    private var autoCallJob: Job? = null // ★ 修 B22：持有拨号循环的 Job，stopAutoCall() 才能真正取消它
 
     // SIM卡相关状态
     private val _simCardMode = MutableStateFlow(0) // 0: 默认卡, 1: SIM1, 2: SIM2, 3: 双卡交替
@@ -1091,7 +1092,8 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     private fun startAutoCallFromIndex(context: Context, startIndex: Int) {
         if (_isRunning.value && !_isPaused.value) return
-        viewModelScope.launch(Dispatchers.Main) {
+        autoCallJob?.cancel()                       // ★ 修 B22：先取消可能残留的旧循环，避免记录串号
+        autoCallJob = viewModelScope.launch(Dispatchers.Main) {
             _isRunning.value = true
             _isPaused.value = false
             val list = _phoneList.value
@@ -1217,6 +1219,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 // 【关键修复】仅在确认当前通话彻底结束后，才标记为已拨打
                 Log.d(tag, LanguageManager.getString("log.mark_index_called", index))
                 markAsCalled(index)
+                saveData()   // ★ 修 B24：每通结束即落盘，进程随时被杀也不丢
                 
                 // 重置状态标志
                 isCallInProgress = false
@@ -1231,15 +1234,20 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 Log.d(tag, LanguageManager.getString("log.index_completed", index))
             }
 
-            // 只有在真正完成或停止时才清理状态
-            if (!_isPaused.value) {
-                callStateListener?.close()
-                callStateListener = null
-                _callRecords.value = records
-                generateStatistics(records)
-                _currentStatus.value = LanguageManager.getString("status.all_completed")
-                _isRunning.value = false
-            }
+            // 收尾：无条件执行（修 B23 —— 原逻辑被 if (!_isPaused.value) 包住，
+            // 在最后一通通话中按暂停时会被跳过，导致 _isRunning 永远为 true）
+            callStateListener?.close()
+            callStateListener = null
+            // 修 B25：追加而非覆盖。本阶段 CallRecord 尚无 callId，
+            // 先用 (phoneNumber + timestamp) 去重；Task 2.5 引入 callId 后升级为 distinctBy { it.callId }
+            _callRecords.value = (_callRecords.value + records)
+                .distinctBy { it.phoneNumber + it.timestamp }
+            generateStatistics(_callRecords.value)
+            saveData()
+            _currentStatus.value = LanguageManager.getString("status.all_completed")
+            _isRunning.value = false
+            _isPaused.value = false
+            autoCallJob = null
         }
     }
 
@@ -1343,8 +1351,13 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         _isPaused.value = false
         isCallInProgress = false
         currentProcessingIndex = -1
+        autoCallJob?.cancel()                       // ★ 修 B22：真正取消拨号循环协程
+        autoCallJob = null
+        callStateListener?.close()
+        callStateListener = null
         audioInjector?.stop()
         audioRecorder?.release()
+        saveData()
         _currentStatus.value = LanguageManager.getString("status.stopped")
     }
 
