@@ -105,6 +105,30 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     private val _isAccessibilityServiceEnabled = MutableStateFlow(false)
     val isAccessibilityServiceEnabled: StateFlow<Boolean> = _isAccessibilityServiceEnabled
 
+    // ====== 无障碍高级功能状态 ======
+    // 自动挂断
+    private val _isAutoHangupEnabled = MutableStateFlow(false)
+    val isAutoHangupEnabled: StateFlow<Boolean> = _isAutoHangupEnabled
+
+    private val _autoHangupDelay = MutableStateFlow(30) // 秒
+    val autoHangupDelay: StateFlow<Int> = _autoHangupDelay
+
+    // 扬声器自动控制
+    private val _isSpeakerphoneAutoEnabled = MutableStateFlow(false)
+    val isSpeakerphoneAutoEnabled: StateFlow<Boolean> = _isSpeakerphoneAutoEnabled
+
+    // 自动接听延迟
+    private val _autoAnswerDelay = MutableStateFlow(0) // 秒，0表示立即接听
+    val autoAnswerDelay: StateFlow<Int> = _autoAnswerDelay
+
+    // DTMF音发送
+    private val _dtmfTones = MutableStateFlow("")
+    val dtmfTones: StateFlow<String> = _dtmfTones
+
+    // 拨号重试次数
+    private val _dialRetryCount = MutableStateFlow(0)
+    val dialRetryCount: StateFlow<Int> = _dialRetryCount
+
     // 重复号码标记（用于UI视觉反馈）
     private val _duplicatePhoneNumbers = MutableStateFlow<Set<String>>(emptySet())
     val duplicatePhoneNumbers: StateFlow<Set<String>> = _duplicatePhoneNumbers
@@ -113,11 +137,118 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         getApplication<Application>().getSharedPreferences("app_data", Context.MODE_PRIVATE)
     }
 
+    // ★ 修 B24：独立作用域，不依赖 viewModelScope。
+    // androidx 的 ViewModel.clear() 会先取消 viewModelScope 再调用 onCleared()，
+    // 导致 onCleared 里 launch 的协程体永远不会执行 —— 记录因此从不落盘。
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     init {
         loadData()
         loadUpdateSettings()
         loadLanguageSettings()
+        loadAccessibilitySettings()
         refreshAccessibilityServiceStatus()
+    }
+
+    // ====== 无障碍高级功能控制方法 ======
+
+    fun toggleAutoHangup() {
+        _isAutoHangupEnabled.value = !_isAutoHangupEnabled.value
+        saveAccessibilitySettings()
+        syncAccessibilitySettings()
+    }
+
+    fun setAutoHangupDelay(seconds: Int) {
+        if (seconds in 5..600) {
+            _autoHangupDelay.value = seconds
+            saveAccessibilitySettings()
+            syncAccessibilitySettings()
+        }
+    }
+
+    fun toggleSpeakerphoneAuto() {
+        _isSpeakerphoneAutoEnabled.value = !_isSpeakerphoneAutoEnabled.value
+        saveAccessibilitySettings()
+        syncAccessibilitySettings()
+    }
+
+    fun setAutoAnswerDelay(seconds: Int) {
+        if (seconds in 0..30) {
+            _autoAnswerDelay.value = seconds
+            saveAccessibilitySettings()
+            syncAccessibilitySettings()
+        }
+    }
+
+    fun setDtmfTones(tones: String) {
+        // 只允许有效的DTMF字符
+        val validTones = tones.filter { it in "0123456789*#ABCDabcd" }
+        _dtmfTones.value = validTones
+    }
+
+    fun sendDtmfTones() {
+        if (_dtmfTones.value.isNotEmpty()) {
+            AutoCallAccessibilityService.requestSendDtmf(_dtmfTones.value)
+        }
+    }
+
+    fun setDialRetryCount(count: Int) {
+        if (count in 0..5) {
+            _dialRetryCount.value = count
+            saveAccessibilitySettings()
+            syncAccessibilitySettings()
+        }
+    }
+
+    /**
+     * 同步无障碍设置到服务
+     */
+    private fun syncAccessibilitySettings() {
+        AutoCallAccessibilityService.isAutoHangupEnabled = _isAutoHangupEnabled.value
+        AutoCallAccessibilityService.isSpeakerphoneAutoEnabled = _isSpeakerphoneAutoEnabled.value
+        AutoCallAccessibilityService.autoAnswerDelayMs = _autoAnswerDelay.value * 1000L
+        AutoCallAccessibilityService.dialRetryCount = _dialRetryCount.value
+    }
+
+    /**
+     * 保存无障碍设置
+     */
+    private fun saveAccessibilitySettings() {
+        viewModelScope.launch(Dispatchers.IO) {
+            prefs.edit()
+                .putBoolean("auto_hangup_enabled", _isAutoHangupEnabled.value)
+                .putInt("auto_hangup_delay", _autoHangupDelay.value)
+                .putBoolean("speakerphone_auto_enabled", _isSpeakerphoneAutoEnabled.value)
+                .putInt("auto_answer_delay", _autoAnswerDelay.value)
+                .putInt("dial_retry_count", _dialRetryCount.value)
+                .apply()
+        }
+    }
+
+    /**
+     * 加载无障碍设置
+     */
+    private fun loadAccessibilitySettings() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val autoHangupEnabled = prefs.getBoolean("auto_hangup_enabled", false)
+                val autoHangupDelay = prefs.getInt("auto_hangup_delay", 30)
+                val speakerphoneAutoEnabled = prefs.getBoolean("speakerphone_auto_enabled", false)
+                val autoAnswerDelay = prefs.getInt("auto_answer_delay", 0)
+                val dialRetryCount = prefs.getInt("dial_retry_count", 0)
+                withContext(Dispatchers.Main) {
+                    _isAutoHangupEnabled.value = autoHangupEnabled
+                    _autoHangupDelay.value = autoHangupDelay
+                    _isSpeakerphoneAutoEnabled.value = speakerphoneAutoEnabled
+                    _autoAnswerDelay.value = autoAnswerDelay
+                    _dialRetryCount.value = dialRetryCount
+                    // 同步到服务
+                    syncAccessibilitySettings()
+                }
+            } catch (e: Exception) {
+                Log.e(tag, LanguageManager.getString("log.load_accessibility_settings_failed"))
+            }
+        }
     }
 
     fun toggleSimCardMode() {
@@ -1379,19 +1510,18 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     @SuppressLint("UseKtx")
     private fun saveData() {
-        viewModelScope.launch(Dispatchers.IO) {
+        // ★ 修 B24：改由独立 ioScope 写盘，onCleared() 里也能真正执行
+        val app = getApplication<Application>()
+        val phoneListJson = Gson().toJson(_phoneList.value)
+        val recordsJson = Gson().toJson(_callRecords.value)
+        val statisticsText = _statistics.value
+        ioScope.launch {
             try {
-                val gson = Gson()
-                // 保存电话列表
-                val phoneListJson = gson.toJson(_phoneList.value)
-                prefs.edit().putString("phone_list", phoneListJson).apply()
-                
-                // 保存通话记录
-                val recordsJson = gson.toJson(_callRecords.value)
-                prefs.edit().putString("call_records", recordsJson).apply()
-                
-                // 保存统计信息
-                prefs.edit().putString("statistics", _statistics.value).apply()
+                app.getSharedPreferences("app_data", Context.MODE_PRIVATE).edit()
+                    .putString("phone_list", phoneListJson)
+                    .putString("call_records", recordsJson)
+                    .putString("statistics", statisticsText)
+                    .apply()
             } catch (e: Exception) {
                 Log.e(tag, LanguageManager.getString("log.save_data_failed", e.message ?: ""))
             }
