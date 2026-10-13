@@ -12,6 +12,7 @@
 >
 > 最近 5 个版本的更新日志请参阅 [README.md](README.md)（中文）或 [README_EN.md](README_EN.md)（英文）。
 
+<<<<<<< HEAD
 ---
 
 ### v4.2.0（未发布 · 未构建验证）- **三通道音频 / 录音规范化 / 拨号加固**
@@ -51,6 +52,8 @@
 | 🔧 **隐私保护**：明确无障碍服务不收集任何用户数据 | **Privacy Protection**: Clarified that accessibility service does not collect any user data |
 
 ---
+=======
+>>>>>>> d7a8becdf26485133764fed81f5df037a80ae647
 
 ## v3.x 系列
 
