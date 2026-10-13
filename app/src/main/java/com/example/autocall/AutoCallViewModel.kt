@@ -4,10 +4,12 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import android.content.Intent
-import android.media.AudioManager
-import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
+import com.example.autocall.audio.AudioInjector
+import com.example.autocall.audio.AudioSession
+import com.example.autocall.audio.Capabilities
+import com.example.autocall.audio.ChannelProbe
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.opencsv.CSVReader
@@ -55,9 +57,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     val statistics: StateFlow<String> = _statistics
 
     private var callStateListener: CallStateListener? = null
-    private var currentMediaPlayer: MediaPlayer? = null
-    private var audioInjector: CallAudioInjector? = null
+    private var audioInjector: AudioInjector? = null
     private var audioRecorder: CallAudioRecorder? = null
+
+    // ★ 通道探测结果（Task 1.3/1.9）：UI 可展示当前生效通道
+    private val _capabilities = MutableStateFlow<Capabilities?>(null)
+    val capabilities: StateFlow<Capabilities?> = _capabilities
 
     private val _isRecordingEnabled = MutableStateFlow(false)
     val isRecordingEnabled: StateFlow<Boolean> = _isRecordingEnabled
@@ -150,6 +155,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         loadLanguageSettings()
         loadAccessibilitySettings()
         refreshAccessibilityServiceStatus()
+        refreshCapabilities()
     }
 
     // ====== 无障碍高级功能控制方法 ======
@@ -344,6 +350,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
      */
     fun openAccessibilitySettings() {
         AutoCallAccessibilityService.openAccessibilitySettings(getApplication<Application>())
+    }
+
+    /** 探测当前设备可用的录音/注入通道（Task 1.3） */
+    fun refreshCapabilities() {
+        _capabilities.value = ChannelProbe.probe(getApplication(), _isAccessibilityServiceEnabled.value)
     }
 
     // ★ 修 B7：关键运行开关持久化，避免重启 App 后录音/播放开关与选中音频回退默认值
@@ -1176,8 +1187,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                 var recordPath: String? = null
                 if (connected) {
                     Log.d(tag, LanguageManager.getString("log.call_connected"))
-                    // 初始化音频注入器和录音器
-                    if (audioInjector == null) audioInjector = CallAudioInjector(getApplication())
+                    // ★ 通道探测 + 单一音频会话（修 B3/B19：录音与注入不再各自抢通道）
+                    val caps = ChannelProbe.probe(getApplication(), _isAccessibilityServiceEnabled.value)
+                    _capabilities.value = caps
+                    AudioSession.beginCall()
+                    if (audioInjector == null) audioInjector = ChannelProbe.injectorFor(getApplication(), caps)
                     if (audioRecorder == null) audioRecorder = CallAudioRecorder(getApplication())
 
                     // 启动录音（如果开启）
@@ -1185,7 +1199,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                         recordPath = audioRecorder?.startRecording(entry.phoneNumber)
                         _currentStatus.value = LanguageManager.getString("status.recording_started")
                         Log.d(tag, LanguageManager.getString("log.recording_started"))
-                        delay(500L)
+                        AudioSession.awaitStable(300)   // 修 B13：用会话等待替代 delay(500L) 魔法数字
                     }
 
                     // 播放音频（如果开启且存在音频文件）
@@ -1193,13 +1207,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                         _currentStatus.value = LanguageManager.getString("status.call_connected_playing")
                         Log.d(tag, LanguageManager.getString("log.start_playing_audio"))
                         val disconnectJob = viewModelScope.launch { waitForCallDisconnect(index) }
-                        val audioJob = viewModelScope.launch { audioInjector?.injectAudioToCall(audioPath) }
+                        val audioJob = viewModelScope.launch { audioInjector?.inject(audioPath) }
 
                         disconnectJob.join()
                         Log.d(tag, LanguageManager.getString("log.disconnect_detected"))
                         audioJob.cancel()
                         audioInjector?.stop()
-                        stopAudioPlayback()
                     } else {
                         // 不播放音频，只等待挂断
                         _currentStatus.value = LanguageManager.getString("status.call_connected_no_audio")
@@ -1312,18 +1325,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                             Log.d(tag, LanguageManager.getString("log.confirmed_disconnect"))
                             if (!result.isCompleted) {
                                 audioInjector?.stop()
-                                stopAudioPlayback()
+                                AudioSession.endCall()
                                 if (_isRecordingEnabled.value && audioRecorder?.isRecording() == true) {
                                     audioRecorder?.stopRecording()
                                 }
-                                // 重置音频模式
-                                val am = getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                if (am != null) {
-                                    am.mode = AudioManager.MODE_NORMAL
-                                    am.setSpeakerphoneOn(false)
-                                } else {
-                                    Log.w(tag, LanguageManager.getString("log.cannot_get_audio_manager"))
-                                }
+                                // 修 B32：不再硬编码重置 mode/免提 —— 音频现场由注入器的 AudioSnapshot
+                                // 在 finally 中 100% 还原，避免覆盖用户已有的音频设置。
                                 result.complete(Unit)
                             }
                         } else {
@@ -1344,14 +1351,6 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun stopAudioPlayback() {
-        currentMediaPlayer?.apply {
-            if (isPlaying) stop()
-            release()
-        }
-        currentMediaPlayer = null
-    }
-
     private fun generateStatistics(records: List<CallRecord>) {
         val total = records.size
         val success = records.count { it.callStatus == LanguageManager.getString("status.call_success") }
@@ -1368,6 +1367,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         currentProcessingIndex = -1
         autoCallJob?.cancel()                       // ★ 修 B22：真正取消拨号循环协程
         autoCallJob = null
+        AudioSession.endCall()
         callStateListener?.close()
         callStateListener = null
         audioInjector?.stop()
@@ -1532,7 +1532,6 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         callStateListener?.close()
         audioInjector?.stop()
         audioRecorder?.release()
-        stopAudioPlayback()
         saveData()
     }
 
