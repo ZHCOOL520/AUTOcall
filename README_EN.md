@@ -122,6 +122,51 @@ Tap the **⚙️ Settings** icon in the top-right corner:
 
 ## 🔄 Changelog
 
+### v4.2.0 (Unreleased · Not built/verified) - **Three-channel audio / Recording normalization / Dialing hardening**
+
+> ⚠️ **Status**: This entry corresponds to a code commit (branch `feat/audio-overhaul`). It is **not built, not verified on a real device, and not released**; below only describes what this commit adds/fixes.
+
+**Audio channels (core)**
+
+- ✨ **Three-channel injection abstraction**: ROOT direct / speaker loopback (default, works on any device) / accessibility fallback; auto-probed at runtime (`ChannelProbe` + `SuProbe` + `VoiceCallProbe`) on startup and before each connect
+- ✨ **Single audio session**: recording and injection share one `AudioSession` instead of fighting over `STREAM_VOICE_CALL`; snapshot-restore fully reverts audio state after a call
+- ✨ **Unified PCM decoding**: mp3/m4a/wav/ogg/flac → 16k mono; 300ms fades; howling detection with dynamic gain downshift (`EchoGuard`)
+
+**Recording normalization**
+
+- ✨ **Naming spec**: `00001_O1_13800138000_13900139000_20260608_143052317_46s_ok.m4a`
+- ✨ **Storage**: private `year/month/day` folders + same-name `.json` sidecar; mirrored to the public library `Music/AUTOcall/yyyy-MM-dd/` via `MediaStore`
+- ✨ **Real talk time**: duration measured from "connected → hung up", excluding ringing
+- ✨ **Recording library screen**: list / play / share / delete / open public copy
+- ✨ **Foreground service for recording**: `foregroundServiceType=microphone|phoneCall`, survives lock screen and backgrounding
+
+**Dialing hardening**
+
+- 🐛 **Stops instantly**: the dial loop `Job` can really be cancelled; cleanup runs in `NonCancellable`, so stop/pause/error paths leave no residual state and never lose records
+- ✨ **Resume**: last progress persisted; main screen offers "Resume from #N"
+- ✨ **Retry queue**: failed numbers are retried in a round after the main pass (rounds configurable)
+- 🐛 **Hang up on connect timeout** before dialing the next; disconnect wait aligned with the auto-hangup limit
+
+**Accessibility (third fallback channel)**
+
+- ✨ **Externalized keyword table**: `assets/incall_button_keywords.json` (with exclude words + preferred viewIds), hot-updatable
+- ✨ **Self-check screen**: shows whether record/speaker/answer/hangup buttons can be found
+- 🐛 **Fixes**: accessibility no longer force-disables recording; removed the self-built `VOICE_CALL` recorder (UI tapping only)
+
+**Records & statistics**
+
+- 🐛 **Real call-record export**: CSV with time/direction/SIM/number/name/result/talk time/recording path/channel (it used to export the phone list)
+- 🐛 **Duration formatting**: `H:MM:SS`, distinguishing total talk time vs total dial time
+- 🐛 **Re-resolve audio path by name** before playback (no longer lost after import dedup renaming)
+- 🐛 **Sample audio now uses explicit label mapping** (no more index-based guessing)
+
+**Cleanup & permissions**
+
+- ♻️ Removed ~485 lines of dead code (Glass components, ThemeManager, and old `CallAudioInjector` / `CallAudioRecorder`)
+- 🔧 Permission slimming: dropped unrelated storage/media permissions; added `POST_NOTIFICATIONS`, `ANSWER_PHONE_CALLS`
+
+---
+
 ### v4.1.3 (2026-06-08) - **Accessibility Mode Refactor & Smart Deduplication**
 
 - ♻️ **Feature Renaming**: Unified renaming of "Accessibility Service" to "Accessibility Mode", all user-visible text dynamically retrieved via LanguageManager
