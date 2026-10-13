@@ -4,29 +4,17 @@
 
     <!-- 拨打电话权限 -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
-    <!-- 读取外部存储权限（用于读取语音文件） -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <!-- Android 13+ 读取媒体文件权限 -->
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <!-- 读取所有文件权限（用于导入表格） -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- 读取电话状态权限 -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- 录音权限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- 修改音频设置权限 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <!-- 辅助功能权限 -->
-    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" 
-        tools:ignore="ProtectedPermissions" />
     <!-- 网络权限（用于检查更新） -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 安装APK权限 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- 下载文件权限 -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
-        android:maxSdkVersion="32" />
 
     <!-- 声明电话硬件功能（非必需） -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />

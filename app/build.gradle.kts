@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.autocall"
         minSdk = 26
         targetSdk = 36
-        versionCode = 413
-        versionName = "4.1.3"
+        versionCode = 420
+        versionName = "4.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
