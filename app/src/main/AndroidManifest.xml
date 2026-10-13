@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- 录音权限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- ★ Task 3.3（B29）：接通超时后挂断已拨出电话 -->
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
     <!-- 修改音频设置权限 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- 网络权限（用于检查更新） -->
@@ -15,6 +17,12 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 安装APK权限 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- ★ Task 3.6：通话录音前台服务 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <!-- ★ Task 3.6：Android 13+ 前台服务通知需运行时授权 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- 声明电话硬件功能（非必需） -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
@@ -65,6 +73,12 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- ★ Task 3.6：录音前台服务 -->
+        <service
+            android:name=".service.CallRecordingService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|phoneCall" />
     </application>
 
 </manifest>

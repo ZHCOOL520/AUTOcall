@@ -1,0 +1,27 @@
+{
+  "recordStart": {
+    "text": ["录音", "录制", "通话录音", "Record", "録音", "녹음", "บันทึก", "تسجيل"],
+    "excludeText": ["录音设置", "录音列表", "停止录音", "录音文件"],
+    "preferViewIds": ["com.android.dialer:id/incall_record", "com.android.incallui:id/record_button", "com.samsung.android.incallui:id/record"]
+  },
+  "recordStop": {
+    "text": ["停止录音", "停止录制", "结束录音", "Stop recording", "Stop"],
+    "excludeText": [],
+    "preferViewIds": []
+  },
+  "speaker": {
+    "text": ["免提", "扬声器", "Speaker", "Speakerphone", "スピーカー"],
+    "excludeText": [],
+    "preferViewIds": []
+  },
+  "answer": {
+    "text": ["接听", "接听电话", "Answer", "応答"],
+    "excludeText": [],
+    "preferViewIds": []
+  },
+  "hangup": {
+    "text": ["挂断", "结束通话", "Hang up", "End call", "終了"],
+    "excludeText": [],
+    "preferViewIds": []
+  }
+}

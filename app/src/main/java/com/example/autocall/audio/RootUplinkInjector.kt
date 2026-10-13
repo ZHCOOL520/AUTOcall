@@ -15,7 +15,11 @@ import kotlinx.coroutines.withContext
  * 本机不外放。需由 [ChannelProbe] 在探测通过后才会被选用；探测不通过时自动降级到
  * [SpeakerLoopbackInjector]。
  */
-class RootUplinkInjector(private val context: Context) : AudioInjector {
+class RootUplinkInjector(
+    private val context: Context,
+    /** 实时麦克风幅度来源（保留参数位，ROOT 通道本机不外放，一般不做啸叫降档）。 */
+    @Suppress("unused") private val amplitudeSource: () -> Int = { 0 }
+) : AudioInjector {
 
     private var track: AudioTrack? = null
 

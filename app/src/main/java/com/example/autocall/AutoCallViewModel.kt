@@ -3,13 +3,11 @@ package com.example.autocall
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.util.Log
-import com.example.autocall.audio.AudioInjector
-import com.example.autocall.audio.AudioSession
 import com.example.autocall.audio.Capabilities
 import com.example.autocall.audio.ChannelProbe
+import com.example.autocall.record.CallResult
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.opencsv.CSVReader
@@ -21,6 +19,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import java.io.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+
+/** ★ 修 B43：内置样本音频，带显式标签 key（不再按下标硬编码）。 */
+data class SampleAudio(val fileName: String, val labelKey: String)
 
 class AutoCallViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -44,7 +45,12 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     private var audioDirectory: File? = null
 
-    private val sampleAudios = listOf("yu_peng_buzu.wav", "ding.wav", "no.wav")
+    // ★ 修 B43：样本音频改为「显式标签映射」，不再靠下标 0/1/2 猜标签
+    private val sampleAudios = listOf(
+        SampleAudio("yu_peng_buzu.wav", "audio_selector.audio_0"),
+        SampleAudio("ding.wav", "audio_selector.audio_1"),
+        SampleAudio("no.wav", "audio_selector.audio_2")
+    )
 
     private val _userAudios = MutableStateFlow<List<String>>(emptyList())
 
@@ -52,13 +58,14 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
     val selectedAudioIndex: StateFlow<Int> = _selectedAudioIndex
 
     private val _callRecords = MutableStateFlow<List<CallRecord>>(emptyList())
+    // ★ 修 B41：暴露通话记录公开流，供录音库页面（Task 2.9）读取
+    val callRecords: StateFlow<List<CallRecord>> = _callRecords
 
     private val _statistics = MutableStateFlow("")
     val statistics: StateFlow<String> = _statistics
 
-    private var callStateListener: CallStateListener? = null
-    private var audioInjector: AudioInjector? = null
-    private var audioRecorder: CallAudioRecorder? = null
+    // ★ Task 3.1：拨号主循环（Job / 状态监听 / 注入器 / 录音器）全部收敛到控制器
+    private var callController: PhoneCallController? = null
 
     // ★ 通道探测结果（Task 1.3/1.9）：UI 可展示当前生效通道
     private val _capabilities = MutableStateFlow<Capabilities?>(null)
@@ -84,10 +91,6 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     private val _callInterval = MutableStateFlow(3000L) // 拨打间隔时间（毫秒），默认3秒
     val callInterval: StateFlow<Long> = _callInterval
-
-    @Volatile private var currentProcessingIndex: Int = -1 // 当前正在处理的索引（原子性保护）
-    @Volatile private var isCallInProgress: Boolean = false // 是否有通话正在进行
-    private var autoCallJob: Job? = null // ★ 修 B22：持有拨号循环的 Job，stopAutoCall() 才能真正取消它
 
     // SIM卡相关状态
     private val _simCardMode = MutableStateFlow(0) // 0: 默认卡, 1: SIM1, 2: SIM2, 3: 双卡交替
@@ -402,9 +405,8 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             _currentStatus.value = LanguageManager.getString("status.recording_enabled")
         } else {
             _currentStatus.value = LanguageManager.getString("status.recording_disabled")
-            if (audioRecorder?.isRecording() == true) {
-                audioRecorder?.stopRecording()
-            }
+            // 关闭录音时丢弃未落盘的临时文件（正常路径由拨号循环 commit）
+            callController?.cancelRecording()
         }
         saveRuntimeSettings()
     }
@@ -611,7 +613,14 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun getAllAudios(): List<String> = sampleAudios + _userAudios.value
+    fun getAllAudios(): List<String> = sampleAudios.map { it.fileName } + _userAudios.value
+
+    /** ★ 修 B43：样本音频数量（用户音频下标从前在此之后）。 */
+    fun sampleAudioCount(): Int = sampleAudios.size
+
+    /** ★ 修 B43：样本音频的显式标签 key；非样本（用户导入）返回 null。 */
+    fun getAudioLabelKey(index: Int): String? =
+        if (index in sampleAudios.indices) sampleAudios[index].labelKey else null
 
     fun selectAudio(index: Int) {
         val all = getAllAudios()
@@ -664,7 +673,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                     val audioPath = if (!audioName.isNullOrEmpty()) getAudioPath(context, audioName) else null
                     val accountNumber = if (accountNumberCol >= 0 && accountNumberCol < row.physicalNumberOfCells) getCellValue(row.getCell(accountNumberCol))?.trim() else null
                     val balance = if (balanceCol >= 0 && balanceCol < row.physicalNumberOfCells) getCellValue(row.getCell(balanceCol))?.trim() else null
-                    phoneList.add(PhoneEntry(phone, name, audioPath, accountNumber, balance))
+                    phoneList.add(PhoneEntry(phoneNumber = phone, contactName = name, audioFilePath = audioPath, accountNumber = accountNumber, balance = balance, audioName = audioName))
                 }
                 workbook.close()
                 inputStream.close()
@@ -744,7 +753,7 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
                         val audioPath = audioName?.let { getAudioPath(context, it) }
                         val accountNumber = if (accountNumberCol >= 0 && row.size > accountNumberCol && row[accountNumberCol].isNotBlank()) row[accountNumberCol].trim() else null
                         val balance = if (balanceCol >= 0 && row.size > balanceCol && row[balanceCol].isNotBlank()) row[balanceCol].trim() else null
-                        phoneList.add(PhoneEntry(phone, name, audioPath, accountNumber, balance))
+                        phoneList.add(PhoneEntry(phoneNumber = phone, contactName = name, audioFilePath = audioPath, accountNumber = accountNumber, balance = balance, audioName = audioName))
                     }
                 }
                 withContext(Dispatchers.Main) {
@@ -1050,10 +1059,50 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
             val file = File(it, fileName)
             if (file.exists()) return file.absolutePath
         }
+        // 修 B8：导入写入的是 .../audio/ 子目录，兜底也要查这里，而非仅查私有根目录
+        val audioSubDir = File(context.getExternalFilesDir(null), "audio")
+        if (audioSubDir.exists()) {
+            val file = File(audioSubDir, fileName)
+            if (file.exists()) return file.absolutePath
+        }
         val defaultDir = context.getExternalFilesDir(null)
         if (defaultDir != null) {
             val file = File(defaultDir, fileName)
             if (file.exists()) return file.absolutePath
+        }
+        return null
+    }
+
+    /**
+     * ★ 修 B8/B34：播放前按表格里填写的**原始**文件名重解析真实路径。
+     *
+     * 导入去重时会把同名文件改名成 `name_1.ext`，若只保存导入时解析出的路径，
+     * 之后表格改名/文件改名就永久失联。这里每次播放前依次尝试：
+     *  1. `.../audio/name` 与私有根目录下的同名文件；
+     *  2. `name_N.ext` 去重改名后的文件（前缀 + 扩展名匹配）。
+     */
+    private fun resolveAudioByName(context: Context, name: String?): String? {
+        if (name.isNullOrBlank()) return null
+        val dirs = listOfNotNull(
+            audioDirectory,
+            File(context.getExternalFilesDir(null), "audio"),
+            context.getExternalFilesDir(null)
+        )
+        // 1) 精确同名
+        for (d in dirs) {
+            val f = File(d, name)
+            if (f.exists()) return f.absolutePath
+        }
+        // 2) 去重改名 name_N.ext（name_1.ext, name_2.ext …）
+        val base = name.substringBeforeLast('.')
+        val ext = name.substringAfterLast('.', "")
+        for (d in dirs) {
+            if (!d.exists()) continue
+            val hit = d.listFiles()?.firstOrNull { f ->
+                f.isFile && f.name.startsWith("${base}_") &&
+                    (ext.isEmpty() || f.extension.equals(ext, ignoreCase = true))
+            }
+            if (hit != null) return hit.absolutePath
         }
         return null
     }
@@ -1113,363 +1162,116 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
 
     // ---------- 核心拨打流程 ----------
     fun startAutoCall(context: Context) {
+        // ★ Task 3.4：全新开始，重置断点
+        prefs.edit().putInt("last_completed_index", -1).apply()
         startAutoCallFromIndex(context, 0)
+    }
+
+    /** ★ Task 3.4：断点续拨的起始索引（上次已完成的下一通）。 */
+    fun resumeIndex(): Int = prefs.getInt("last_completed_index", -1) + 1
+
+    /** ★ Task 3.4：从上次断点继续拨号。 */
+    fun startAutoCallFromLastIndex(context: Context) {
+        startAutoCallFromIndex(context, resumeIndex())
     }
 
     private fun startAutoCallFromIndex(context: Context, startIndex: Int) {
         if (_isRunning.value && !_isPaused.value) return
-        autoCallJob?.cancel()                       // ★ 修 B22：先取消可能残留的旧循环，避免记录串号
-        autoCallJob = viewModelScope.launch(Dispatchers.Main) {
-            _isRunning.value = true
-            _isPaused.value = false
-            val list = _phoneList.value
-            if (list.isEmpty()) {
-                _currentStatus.value = LanguageManager.getString("status.phone_list_empty")
-                _isRunning.value = false
-                return@launch
-            }
+        // ★ Task 3.1：拨号主循环与其 Job 交由 PhoneCallController 持有（含 NonCancellable 收尾）
+        callController?.stop()   // 先停掉上一个控制器，避免遗留循环（修 B22）
+        callController = PhoneCallController(getApplication(), createPhoneCallHost())
+        callController?.start(context, startIndex)
+    }
 
-            // 清理旧监听器，新建并注册
-            callStateListener?.close()
-            callStateListener = CallStateListener(getApplication()).also { it.register() }
+    /**
+     * 用**匿名对象**实现 [PhoneCallHost]：匿名对象位于本类词法作用域内，
+     * 因此可直接访问 ViewModel 的私有成员，无需放宽任何成员的可见性。
+     */
+    private fun createPhoneCallHost(): PhoneCallHost = object : PhoneCallHost {
+        override fun phoneList(): List<PhoneEntry> = _phoneList.value
+        override fun simCardMode(): Int = _simCardMode.value
+        override fun currentSimCard(): Int = _currentSimCard.value
+        override fun callIntervalMs(): Long = _callInterval.value
+        override fun isRecordingEnabled(): Boolean = _isRecordingEnabled.value
+        override fun isAudioPlaybackEnabled(): Boolean = _isAudioPlaybackEnabled.value
+        override fun isAccessibilityEnabled(): Boolean = _isAccessibilityServiceEnabled.value
+        override fun dialRetryCount(): Int = _dialRetryCount.value
+        override fun isRunning(): Boolean = _isRunning.value
+        override fun isPaused(): Boolean = _isPaused.value
+        override fun existingRecords(): List<CallRecord> = _callRecords.value
+        override fun resolveAudioPath(entry: PhoneEntry): String? =
+            resolveAudioByName(this@AutoCallViewModel.getApplication(), entry.audioName)
+                ?: entry.audioFilePath
+                ?: getCurrentAudioFile(this@AutoCallViewModel.getApplication())
+        override fun lastCompletedIndex(): Int = prefs.getInt("last_completed_index", -1)
 
-            val records = mutableListOf<CallRecord>()
-            _currentStatus.value = LanguageManager.getString("status.auto_call_started", list.size, startIndex + 1)
-
-            for ((index, entry) in list.withIndex()) {
-                if (index < startIndex) continue // 跳过已经拨打过的
-                
-                // 检查是否被停止或暂停
-                if (!_isRunning.value) break
-                if (_isPaused.value) {
-                    // 暂停状态下，保持_isRunning为true，等待恢复
-                    _currentStatus.value = LanguageManager.getString("status.paused_at", index + 1, list.size)
-                    // 等待直到不再暂停或被停止
-                    while (_isPaused.value && _isRunning.value) {
-                        delay(500L)
-                    }
-                    // 如果被停止则退出
-                    if (!_isRunning.value) break
-                }
-                
-                // 【关键修复】设置当前处理索引，防止状态混乱
-                currentProcessingIndex = index
-                isCallInProgress = true
-                
-                _currentIndex.value = index
-                _progress.value = index + 1
-                _currentStatus.value = LanguageManager.getString("status.dialing", index + 1, list.size, entry.contactName.ifEmpty { entry.phoneNumber })
-                Log.d(tag, LanguageManager.getString("log.start_dial_index", index, entry.phoneNumber))
-
-                val startTime = System.currentTimeMillis()
-                val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-                    .format(java.util.Date(startTime))
-
-                val audioPath = entry.audioFilePath ?: getCurrentAudioFile(getApplication())
-                
-                // 根据SIM卡模式选择拨打方式
-                val callSuccess = when (_simCardMode.value) {
-                    3 -> {
-                        // 双卡交替模式
-                        _currentSimCard.value = if (_currentSimCard.value == 0) 1 else 0
-                        makeCallWithSimCard(context, entry.phoneNumber, _currentSimCard.value)
-                    }
-                    1 -> makeCallWithSimCard(context, entry.phoneNumber, 0) // SIM1
-                    2 -> makeCallWithSimCard(context, entry.phoneNumber, 1) // SIM2
-                    else -> makeCall(context, entry.phoneNumber) // 默认卡
-                }
-
-                _currentStatus.value = LanguageManager.getString("status.waiting_connect")
-                Log.d(tag, LanguageManager.getString("log.waiting_connect"))
-                val connected = waitForCallConnect()
-                Log.d(tag, LanguageManager.getString("log.connect_result", connected))
-
-                var recordPath: String? = null
-                if (connected) {
-                    Log.d(tag, LanguageManager.getString("log.call_connected"))
-                    // ★ 通道探测 + 单一音频会话（修 B3/B19：录音与注入不再各自抢通道）
-                    val caps = ChannelProbe.probe(getApplication(), _isAccessibilityServiceEnabled.value)
-                    _capabilities.value = caps
-                    AudioSession.beginCall()
-                    if (audioInjector == null) audioInjector = ChannelProbe.injectorFor(getApplication(), caps)
-                    if (audioRecorder == null) audioRecorder = CallAudioRecorder(getApplication())
-
-                    // 启动录音（如果开启）
-                    if (_isRecordingEnabled.value) {
-                        recordPath = audioRecorder?.startRecording(entry.phoneNumber)
-                        _currentStatus.value = LanguageManager.getString("status.recording_started")
-                        Log.d(tag, LanguageManager.getString("log.recording_started"))
-                        AudioSession.awaitStable(300)   // 修 B13：用会话等待替代 delay(500L) 魔法数字
-                    }
-
-                    // 播放音频（如果开启且存在音频文件）
-                    if (_isAudioPlaybackEnabled.value && !audioPath.isNullOrEmpty()) {
-                        _currentStatus.value = LanguageManager.getString("status.call_connected_playing")
-                        Log.d(tag, LanguageManager.getString("log.start_playing_audio"))
-                        val disconnectJob = viewModelScope.launch { waitForCallDisconnect(index) }
-                        val audioJob = viewModelScope.launch { audioInjector?.inject(audioPath) }
-
-                        disconnectJob.join()
-                        Log.d(tag, LanguageManager.getString("log.disconnect_detected"))
-                        audioJob.cancel()
-                        audioInjector?.stop()
-                    } else {
-                        // 不播放音频，只等待挂断
-                        _currentStatus.value = LanguageManager.getString("status.call_connected_no_audio")
-                        Log.d(tag, LanguageManager.getString("log.waiting_manual_hangup"))
-                        waitForCallDisconnect(index)
-                        Log.d(tag, LanguageManager.getString("log.disconnect_detected_no_audio"))
-                    }
-
-                    // 停止录音（如果开启）
-                    if (_isRecordingEnabled.value && audioRecorder?.isRecording() == true) {
-                        recordPath = audioRecorder?.stopRecording()
-                        Log.d(tag, LanguageManager.getString("log.recording_stopped"))
-                    }
-                    _currentStatus.value = LanguageManager.getString("status.call_ended")
-                    Log.d(tag, LanguageManager.getString("log.call_flow_end"))
-                } else {
-                    _currentStatus.value = LanguageManager.getString("status.call_not_connected")
-                    Log.d(tag, LanguageManager.getString("log.not_connected_skip"))
-                    recordPath = null // 明确赋值为null
-                }
-
-                val status = if (connected && callSuccess) LanguageManager.getString("status.call_success") else LanguageManager.getString("status.call_failed")
-                records.add(CallRecord(
-                    phoneNumber = entry.phoneNumber,
-                    contactName = entry.contactName.ifEmpty { LanguageManager.getString("status.unknown") },
-                    callStatus = status,
-                    callDuration = (System.currentTimeMillis() - startTime) / 1000,
-                    timestamp = timestamp,
-                    recordFilePath = recordPath
-                ))
-                
-                // 【关键修复】仅在确认当前通话彻底结束后，才标记为已拨打
-                Log.d(tag, LanguageManager.getString("log.mark_index_called", index))
-                markAsCalled(index)
-                saveData()   // ★ 修 B24：每通结束即落盘，进程随时被杀也不丢
-                
-                // 重置状态标志
-                isCallInProgress = false
-                currentProcessingIndex = -1
-                
-                // 等待通话完全结束并进入IDLE状态
-                Log.d(tag, LanguageManager.getString("log.wait_call_interval", _callInterval.value / 1000))
-                delay(_callInterval.value)
-                
-                // 确保系统处于空闲状态后再继续
-                waitForIdleState()
-                Log.d(tag, LanguageManager.getString("log.index_completed", index))
-            }
-
-            // 收尾：无条件执行（修 B23 —— 原逻辑被 if (!_isPaused.value) 包住，
-            // 在最后一通通话中按暂停时会被跳过，导致 _isRunning 永远为 true）
-            callStateListener?.close()
-            callStateListener = null
-            // 修 B25：追加而非覆盖。本阶段 CallRecord 尚无 callId，
-            // 先用 (phoneNumber + timestamp) 去重；Task 2.5 引入 callId 后升级为 distinctBy { it.callId }
-            _callRecords.value = (_callRecords.value + records)
-                .distinctBy { it.phoneNumber + it.timestamp }
-            generateStatistics(_callRecords.value)
-            saveData()
-            _currentStatus.value = LanguageManager.getString("status.all_completed")
-            _isRunning.value = false
-            _isPaused.value = false
-            autoCallJob = null
+        override fun setCurrentSimCard(slot: Int) { _currentSimCard.value = slot }
+        override fun setRunning(running: Boolean) { _isRunning.value = running }
+        override fun setPaused(paused: Boolean) { _isPaused.value = paused }
+        override fun updateStatus(status: String) { _currentStatus.value = status }
+        override fun setProgress(value: Int) { _progress.value = value }
+        override fun setCurrentIndex(index: Int) { _currentIndex.value = index }
+        override fun setCapabilities(caps: Capabilities) { _capabilities.value = caps }
+        override fun setRecords(records: List<CallRecord>) { _callRecords.value = records }
+        override fun markAsCalled(index: Int) { this@AutoCallViewModel.markAsCalled(index) }
+        override fun saveData() { this@AutoCallViewModel.saveData() }
+        override fun generateStatistics(records: List<CallRecord>) { this@AutoCallViewModel.generateStatistics(records) }
+        override fun setLastCompletedIndex(index: Int) {
+            prefs.edit().putInt("last_completed_index", index).apply()
         }
     }
 
-    private suspend fun waitForCallConnect(): Boolean {
-        val listener = callStateListener ?: return false
-        val result = CompletableDeferred<Boolean>()
-        val job = viewModelScope.launch {
-            listener.callStateFlow.collect { state ->
-                when (state) {
-                    CallStateListener.CallState.CONNECTED -> if (!result.isCompleted) result.complete(true)
-                    CallStateListener.CallState.DISCONNECTED -> if (!result.isCompleted) result.complete(false)
-                    else -> {}
-                }
-            }
-        }
-        return try {
-            withTimeoutOrNull(30_000) { result.await() } ?: false
-        } finally {
-            job.cancel()
-        }
-    }
 
-    @Suppress("DEPRECATION")
-    private suspend fun waitForCallDisconnect(expectedIndex: Int) {
-        val listener = callStateListener ?: return
-        val result = CompletableDeferred<Unit>()
-        
-        val job = viewModelScope.launch {
-            listener.callStateFlow.collect { state ->
-                Log.d(tag, LanguageManager.getString("log.state_monitor", state, expectedIndex, currentProcessingIndex))
-                
-                // 【关键修复】只有当前处理的索引匹配时才响应状态变化
-                if (currentProcessingIndex != expectedIndex) {
-                    Log.w(tag, LanguageManager.getString("log.index_mismatch_skip", currentProcessingIndex, expectedIndex))
-                    return@collect
-                }
-                
-                when (state) {
-                    CallStateListener.CallState.DISCONNECTED -> {
-                        Log.d(tag, LanguageManager.getString("log.disconnect_event_detected"))
-                        
-                        // 【关键修复】等待短暂时间确认是否真的断开（防止短暂断线重连）
-                        delay(2000L)
-                        
-                        // 再次检查状态，如果仍然是DISCONNECTED且索引匹配，才确认为真正断开
-                        if (currentProcessingIndex == expectedIndex && isCallInProgress) {
-                            Log.d(tag, LanguageManager.getString("log.confirmed_disconnect"))
-                            if (!result.isCompleted) {
-                                audioInjector?.stop()
-                                AudioSession.endCall()
-                                if (_isRecordingEnabled.value && audioRecorder?.isRecording() == true) {
-                                    audioRecorder?.stopRecording()
-                                }
-                                // 修 B32：不再硬编码重置 mode/免提 —— 音频现场由注入器的 AudioSnapshot
-                                // 在 finally 中 100% 还原，避免覆盖用户已有的音频设置。
-                                result.complete(Unit)
-                            }
-                        } else {
-                            Log.w(tag, LanguageManager.getString("log.state_changed_or_mismatch"))
-                        }
-                    }
-                    CallStateListener.CallState.CONNECTED -> {
-                        Log.d(tag, LanguageManager.getString("log.reconnect_detected"))
-                    }
-                    else -> {}
-                }
-            }
-        }
-        try {
-            withTimeoutOrNull(300_000) { result.await() }
-        } finally {
-            job.cancel()
-        }
-    }
 
     private fun generateStatistics(records: List<CallRecord>) {
         val total = records.size
-        val success = records.count { it.callStatus == LanguageManager.getString("status.call_success") }
+        // 修 B26：按稳定结果码统计成功；兼容历史记录里存的翻译文本
+        val legacySuccess = LanguageManager.getString("status.call_success")
+        val success = records.count { it.resultCode == CallResult.OK.code || it.callStatus == legacySuccess }
         val failed = total - success
-        val totalDuration = records.sumOf { it.callDuration }
-        _statistics.value = LanguageManager.getString("status.statistics", total, success, failed, totalDuration)
+        // 修 B42：区隔「总通话时长」与「总拨打耗时」，并格式化为 时:分:秒
+        val talkDurationSec = records.sumOf { it.callDuration }
+        val dialDurationSec = records.sumOf { it.dialDuration }
+        _statistics.value = LanguageManager.getString(
+            "status.statistics", total, success, failed,
+            formatDuration(talkDurationSec), formatDuration(dialDurationSec)
+        )
+    }
+
+    companion object {
+        /** 修 B42：秒 → `H:MM:SS`（纯逻辑，便于单测）。 */
+        fun formatDuration(seconds: Long): String {
+            val s = seconds.coerceAtLeast(0)
+            return String.format(java.util.Locale.US, "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
+        }
+
+        /** CSV 字段转义：含逗号/引号/换行时用引号包裹并转义引号（纯逻辑，便于单测）。 */
+        internal fun escapeCsvField(field: String): String {
+            return if (field.contains(",") || field.contains("\"") || field.contains("\n") || field.contains("\r")) {
+                "\"${field.replace("\"", "\"\"")}\""
+            } else {
+                field
+            }
+        }
     }
 
     fun stopAutoCall() {
         Log.d(tag, LanguageManager.getString("log.stop_auto_call"))
-        _isRunning.value = false
-        _isPaused.value = false
-        isCallInProgress = false
-        currentProcessingIndex = -1
-        autoCallJob?.cancel()                       // ★ 修 B22：真正取消拨号循环协程
-        autoCallJob = null
-        AudioSession.endCall()
-        callStateListener?.close()
-        callStateListener = null
-        audioInjector?.stop()
-        audioRecorder?.release()
+        // ★ Task 3.1：停止由控制器负责（取消循环 Job，收尾在其 NonCancellable 中完成）
+        callController?.stop()
         saveData()
         _currentStatus.value = LanguageManager.getString("status.stopped")
     }
 
     fun pauseAutoCall() {
-        if (_isRunning.value && !_isPaused.value) {
-            Log.d(tag, LanguageManager.getString("log.pause_auto_call", _currentIndex.value))
-            _isPaused.value = true
-            _currentStatus.value = LanguageManager.getString("status.paused_at", _currentIndex.value + 1, _phoneList.value.size)
-        }
+        Log.d(tag, LanguageManager.getString("log.pause_auto_call", _currentIndex.value))
+        callController?.pause()
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun resumeAutoCall(context: Context) {
-        if (_isRunning.value && _isPaused.value) {
-            Log.d(tag, LanguageManager.getString("log.resume_auto_call", _currentIndex.value))
-            // 仅解除暂停状态，让原协程循环从暂停处自然继续，不启动新协程
-            // 原循环在 while (_isPaused.value && _isRunning.value) 处等待，
-            // 恢复后从 _currentIndex 对应的号码继续拨打，不会跳过
-            _isPaused.value = false
-            _currentStatus.value = LanguageManager.getString("status.resuming")
-        }
-    }
-
-    private suspend fun waitForIdleState() {
-        val listener = callStateListener ?: return
-        // 短暂等待以确保状态稳定
-        delay(500L)
-        // 简单延迟等待，确保系统进入IDLE状态
-        // 由于StateFlow不支持tryReceive，我们直接等待固定时间
-        delay(1000L)
-    }
-
-    @SuppressLint("UseKtx")
-    private fun makeCall(context: Context, phoneNumber: String): Boolean {
-        return try {
-            val intent = Intent(Intent.ACTION_CALL).apply {
-                data = Uri.parse("tel:$phoneNumber")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            true
-        } catch (e: Exception) {
-            _currentStatus.value = LanguageManager.getString("status.dial_failed", e.message ?: "")
-            false
-        }
-    }
-
-    @SuppressLint("UseKtx")
-    private fun makeCallWithSimCard(context: Context, phoneNumber: String, simSlot: Int): Boolean {
-        return try {
-            val intent = Intent(Intent.ACTION_CALL).apply {
-                data = Uri.parse("tel:$phoneNumber")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                // 使用Android标准API指定SIM卡槽
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
-                    // 主要方式：使用SubscriptionManager获取正确的slotId
-                    try {
-                        val subscriptionManager = context.getSystemService(android.telephony.SubscriptionManager::class.java)
-                        if (subscriptionManager != null) {
-                            // 检查权限
-                            if (context.checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                                val activeSubscriptions = subscriptionManager.activeSubscriptionInfoList
-                                if (activeSubscriptions != null && activeSubscriptions.isNotEmpty()) {
-                                    // simSlot是0或1，对应列表索引
-                                    val index = if (simSlot < activeSubscriptions.size) simSlot else 0
-                                    val subscriptionInfo = activeSubscriptions[index]
-                                    // 使用subscriptionId而不是slotId
-                                    putExtra("android.telephony.extra.SUBSCRIPTION_INDEX", subscriptionInfo.subscriptionId)
-                                    putExtra("subscription", subscriptionInfo.subscriptionId)
-                                }
-                            } else {
-                                Log.w(tag, LanguageManager.getString("log.missing_read_phone_state"))
-                            }
-                        }
-                    } catch (e: SecurityException) {
-                        Log.e(tag, LanguageManager.getString("log.permission_insufficient", e.message ?: ""))
-                        // 降级方案：使用旧的extra参数
-                        putExtra("com.android.phone.force.slot", true)
-                        putExtra("Cdma_Supp", true)
-                        putExtra("slot", simSlot)
-                        putExtra("simSlot", simSlot)
-                    } catch (e: Exception) {
-                        Log.e(tag, LanguageManager.getString("log.get_subscription_info_failed", e.message ?: ""))
-                        // 降级方案：使用旧的extra参数
-                        putExtra("com.android.phone.force.slot", true)
-                        putExtra("Cdma_Supp", true)
-                        putExtra("slot", simSlot)
-                        putExtra("simSlot", simSlot)
-                    }
-                }
-            }
-            context.startActivity(intent)
-            _currentStatus.value = LanguageManager.getString("sim_card.using_sim", if (simSlot == 0) LanguageManager.getString("sim_card.mode_sim1") else LanguageManager.getString("sim_card.mode_sim2"))
-            true
-        } catch (e: Exception) {
-            _currentStatus.value = LanguageManager.getString("status.dial_failed", e.message ?: "")
-            false
-        }
+        Log.d(tag, LanguageManager.getString("log.resume_auto_call", _currentIndex.value))
+        callController?.resume()
     }
 
     private fun getCurrentAudioFile(context: Context): String? {
@@ -1478,7 +1280,11 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         return getAudioPath(context, name)
     }
 
-    fun exportCallRecordsToUri(context: Context, uri: Uri) {
+    /**
+     * 导出**号码表**（姓名/号码/余额/户号/拨打次数）为 CSV。
+     * 修 B40：原方法名为 `exportCallRecordsToUri` 但导出的其实是号码表，改名以澄清。
+     */
+    fun exportPhoneListToUri(context: Context, uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val phoneList = _phoneList.value
@@ -1518,20 +1324,56 @@ class AutoCallViewModel(application: Application) : AndroidViewModel(application
         }
     }
     
-    private fun escapeCsvField(field: String): String {
-        // 如果字段包含逗号、引号或换行符，需要用引号包裹
-        return if (field.contains(",") || field.contains("\"") || field.contains("\n") || field.contains("\r")) {
-            "\"${field.replace("\"", "\"\"")}\"" // 转义引号
-        } else {
-            field
+    /**
+     * ★ 修 B40：导出**真正的通话记录**为 CSV（时间/方向/SIM/号码/姓名/结果/通话时长/录音路径/通道）。
+     * 与 [exportPhoneListToUri]（号码表）区分开。
+     */
+    fun exportCallRecordsToUri(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val records = _callRecords.value
+                if (records.isEmpty()) {
+                    withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.no_contacts_to_export") }
+                    return@launch
+                }
+                context.contentResolver.openOutputStream(uri)?.use { os ->
+                    // Windows适配：BOM + UTF-8编码
+                    os.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+                    val writer = OutputStreamWriter(os, Charsets.UTF_8)
+                    writer.write("\uFEFF") // BOM标记
+                    writer.write(LanguageManager.getString("status.csv_header_call_records") + "\r\n")
+
+                    records.forEach { r ->
+                        val cols = listOf(
+                            escapeCsvField(r.timestamp),
+                            escapeCsvField(r.direction),
+                            r.simSlot.toString(),
+                            escapeCsvField(r.phoneNumber),
+                            escapeCsvField(r.contactName),
+                            escapeCsvField(r.resultCode.ifEmpty { r.callStatus }),
+                            formatDuration(r.callDuration),
+                            formatDuration(r.dialDuration),
+                            escapeCsvField(r.recordFilePath ?: ""),
+                            escapeCsvField(r.recordMode)
+                        )
+                        writer.write(cols.joinToString(",") + "\r\n")
+                    }
+                    writer.flush()
+                }
+                withContext(Dispatchers.Main) {
+                    _currentStatus.value = LanguageManager.getString("status.export_success", records.size)
+                }
+            } catch (e: Exception) {
+                Log.e(tag, LanguageManager.getString("log.export_failed", e.message ?: ""))
+                withContext(Dispatchers.Main) { _currentStatus.value = LanguageManager.getString("status.export_failed", e.message ?: "") }
+            }
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        callStateListener?.close()
-        audioInjector?.stop()
-        audioRecorder?.release()
+        // ★ Task 3.1：控制器负责关闭监听器 / 停止注入 / 释放录音
+        callController?.dispose()
         saveData()
     }
 

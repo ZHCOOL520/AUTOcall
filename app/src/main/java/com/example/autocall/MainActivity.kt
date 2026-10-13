@@ -41,6 +41,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.autocall.ui.AccessibilityDiagnosticsScreen
+import com.example.autocall.ui.RecordingLibraryScreen
 import com.example.autocall.ui.theme.AUTOCallTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -170,10 +172,25 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
                                 onImportAudio = { importAudioLauncher.launch("audio/*") },
+                                onOpenRecordings = { navController.navigate("recordings") },
+                                onOpenDiagnostics = { navController.navigate("diagnostics") },
                                 onDeclineDisclaimer = {
                                     declineDisclaimer()
                                     finish()
                                 }
+                            )
+                        }
+                        // ★ Task 2.9：录音库页面
+                        composable("recordings") {
+                            RecordingLibraryScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        // ★ Task 4.4：无障碍自检页面
+                        composable("diagnostics") {
+                            AccessibilityDiagnosticsScreen(
+                                onBack = { navController.popBackStack() }
                             )
                         }
                     }
@@ -203,12 +220,14 @@ class MainActivity : ComponentActivity() {
         val permissions = mutableListOf(
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.RECORD_AUDIO
+            Manifest.permission.RECORD_AUDIO,
+            // ★ Task 3.3（B29）：接通超时后挂断已拨出电话
+            Manifest.permission.ANSWER_PHONE_CALLS
         )
+        // ★ Task 3.6：Android 13+ 录音前台服务的常驻通知需运行时授权（POST_NOTIFICATIONS）
+        // 修 B4：不再请求 READ_MEDIA_AUDIO / READ_EXTERNAL_STORAGE（读写均走私有目录 + SAF）。
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
-        } else {
-            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
         val toRequest = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -337,6 +356,14 @@ fun MainScreen(
                     onImportFile = onImportFile,
                     onImportClipboard = onImportClipboard
                 )
+
+                // ★ Task 3.4：存在未完成进度时提供「从第 N 个继续」
+                val resumeIdx = viewModel.resumeIndex()
+                if (!isRunning && phoneList.isNotEmpty() && resumeIdx in 1 until phoneList.size) {
+                    TextButton(onClick = { viewModel.startAutoCallFromLastIndex(context) }) {
+                        Text(LanguageManager.getString("main_screen.resume_from", resumeIdx + 1))
+                    }
+                }
 
                 Text(
                     text = LanguageManager.getString("main_screen.phone_list", phoneList.size),
@@ -602,6 +629,8 @@ fun SettingsScreen(
     viewModel: AutoCallViewModel,
     onBack: () -> Unit,
     onImportAudio: () -> Unit,
+    onOpenRecordings: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
     onDeclineDisclaimer: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -615,6 +644,12 @@ fun SettingsScreen(
     val callInterval by viewModel.callInterval.collectAsState()
     val selectedLanguage by viewModel.selectedLanguage.collectAsState()
     val isAccessibilityServiceEnabled by viewModel.isAccessibilityServiceEnabled.collectAsState()
+    val isAutoHangupEnabled by viewModel.isAutoHangupEnabled.collectAsState()
+    val autoHangupDelay by viewModel.autoHangupDelay.collectAsState()
+    val isSpeakerphoneAutoEnabled by viewModel.isSpeakerphoneAutoEnabled.collectAsState()
+    val autoAnswerDelay by viewModel.autoAnswerDelay.collectAsState()
+    val dialRetryCount by viewModel.dialRetryCount.collectAsState()
+    val dtmfTones by viewModel.dtmfTones.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
@@ -742,6 +777,11 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.toggleRecording() }
                         )
                     }
+
+                    // ★ Task 2.9：录音库入口
+                    TextButton(onClick = onOpenRecordings) {
+                        Text(LanguageManager.getString("recording_library.title"))
+                    }
                     
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     
@@ -773,6 +813,11 @@ fun SettingsScreen(
                             }
                         )
                     }
+
+                    // ★ Task 4.4：无障碍自检入口
+                    TextButton(onClick = onOpenDiagnostics) {
+                        Text(LanguageManager.getString("accessibility_diagnostics.title"))
+                    }
                     
                     // 描述文本
                     Text(
@@ -781,6 +826,218 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     )
+                }
+            }
+
+            // ====== 无障碍高级功能设置（仅在无障碍模式开启时显示） ======
+            if (isAccessibilityServiceEnabled) {
+                // 自动挂断设置
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isAutoHangupEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(LanguageManager.getString("settings_screen.auto_hangup.title"), fontWeight = FontWeight.Bold)
+                                Text(
+                                    if (isAutoHangupEnabled) LanguageManager.getString("settings_screen.auto_hangup.enabled")
+                                    else LanguageManager.getString("settings_screen.auto_hangup.disabled"),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Switch(
+                                checked = isAutoHangupEnabled,
+                                onCheckedChange = { viewModel.toggleAutoHangup() }
+                            )
+                        }
+                        if (isAutoHangupEnabled) {
+                            Text(
+                                LanguageManager.getString("settings_screen.auto_hangup.delay_title") + " " +
+                                LanguageManager.getString("settings_screen.auto_hangup.delay_seconds", autoHangupDelay),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(10, 30, 60, 120, 300).forEach { seconds ->
+                                    FilterChip(
+                                        selected = autoHangupDelay == seconds,
+                                        onClick = { viewModel.setAutoHangupDelay(seconds) },
+                                        label = { Text(LanguageManager.getString("settings_screen.auto_hangup.delay_seconds", seconds), style = MaterialTheme.typography.bodySmall) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                            Text(
+                                LanguageManager.getString("settings_screen.auto_hangup.delay_description"),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // 扬声器自动控制
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSpeakerphoneAutoEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(LanguageManager.getString("settings_screen.speakerphone.title"), fontWeight = FontWeight.Bold)
+                            Text(
+                                if (isSpeakerphoneAutoEnabled) LanguageManager.getString("settings_screen.speakerphone.enabled")
+                                else LanguageManager.getString("settings_screen.speakerphone.disabled"),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                LanguageManager.getString("settings_screen.speakerphone.description"),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                ),
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        Switch(
+                            checked = isSpeakerphoneAutoEnabled,
+                            onCheckedChange = { viewModel.toggleSpeakerphoneAuto() }
+                        )
+                    }
+                }
+
+                // 自动接听延迟
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            LanguageManager.getString("settings_screen.auto_answer.title") + " " +
+                            if (autoAnswerDelay == 0) LanguageManager.getString("settings_screen.auto_answer.immediate")
+                            else LanguageManager.getString("settings_screen.auto_answer.delay_seconds", autoAnswerDelay),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(0, 2, 5, 10, 15).forEach { seconds ->
+                                FilterChip(
+                                    selected = autoAnswerDelay == seconds,
+                                    onClick = { viewModel.setAutoAnswerDelay(seconds) },
+                                    label = { Text(
+                                        if (seconds == 0) LanguageManager.getString("settings_screen.auto_answer.immediate")
+                                        else LanguageManager.getString("settings_screen.auto_answer.delay_seconds", seconds),
+                                        style = MaterialTheme.typography.bodySmall
+                                    ) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        Text(
+                            LanguageManager.getString("settings_screen.auto_answer.description"),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        )
+                    }
+                }
+
+                // DTMF音发送
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(LanguageManager.getString("settings_screen.dtmf.title"), fontWeight = FontWeight.Bold)
+                        var dtmfInput by remember { mutableStateOf("") }
+                        OutlinedTextField(
+                            value = dtmfInput,
+                            onValueChange = { 
+                                dtmfInput = it.filter { c -> c in "0123456789*#ABCDabcd" }
+                                viewModel.setDtmfTones(dtmfInput)
+                            },
+                            label = { Text(LanguageManager.getString("settings_screen.dtmf.input_hint"), style = MaterialTheme.typography.bodySmall) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium
+                        )
+                        Button(
+                            onClick = { viewModel.sendDtmfTones() },
+                            enabled = dtmfTones.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(LanguageManager.getString("settings_screen.dtmf.send_button"))
+                        }
+                        Text(
+                            LanguageManager.getString("settings_screen.dtmf.description"),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        )
+                    }
+                }
+
+                // 拨号重试设置
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            LanguageManager.getString("settings_screen.dial_retry.title") + " " +
+                            if (dialRetryCount == 0) LanguageManager.getString("settings_screen.dial_retry.no_retry")
+                            else LanguageManager.getString("settings_screen.dial_retry.count_times", dialRetryCount),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(0, 1, 2, 3, 5).forEach { count ->
+                                FilterChip(
+                                    selected = dialRetryCount == count,
+                                    onClick = { viewModel.setDialRetryCount(count) },
+                                    label = { Text(
+                                        if (count == 0) LanguageManager.getString("settings_screen.dial_retry.no_retry")
+                                        else LanguageManager.getString("settings_screen.dial_retry.count_times", count),
+                                        style = MaterialTheme.typography.bodySmall
+                                    ) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        Text(
+                            LanguageManager.getString("settings_screen.dial_retry.description"),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        )
+                    }
                 }
             }
 
@@ -1551,11 +1808,12 @@ fun AudioSelector(
                 contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
                 itemsIndexed(allAudios) { index, _ ->
-                    val displayName = when (index) {
-                        0 -> LanguageManager.getString("audio_selector.audio_0")
-                        1 -> LanguageManager.getString("audio_selector.audio_1")
-                        2 -> LanguageManager.getString("audio_selector.audio_2")
-                        else -> LanguageManager.getString("audio_selector.custom_audio", index - 2)
+                    // ★ 修 B43：样本音频按显式 labelKey 取标签，不再用下标 0/1/2 猜
+                    val labelKey = viewModel.getAudioLabelKey(index)
+                    val displayName = if (labelKey != null) {
+                        LanguageManager.getString(labelKey)
+                    } else {
+                        LanguageManager.getString("audio_selector.custom_audio", index - viewModel.sampleAudioCount() + 1)
                     }
                     FilterChip(
                         selected = selectedIndex == index,

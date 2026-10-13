@@ -14,6 +14,7 @@
   "main_screen": {
     "title": "Auto Phone Dialing System",
     "phone_list": "Phone List (%d)",
+    "resume_from": "Resume from #%d",
     "sort": {
       "call_count": "By Call Count",
       "call_count_asc": "✓ Count Ascending",
@@ -201,6 +202,41 @@
       "service_connected": "Accessibility mode connected",
       "service_interrupted": "Accessibility mode interrupted",
       "service_destroyed": "Accessibility mode destroyed"
+    },
+    "auto_hangup": {
+      "title": "📵 Auto Hangup",
+      "enabled": "✅ Enabled: Auto hangup after set duration",
+      "disabled": "❌ Disabled: No auto hangup",
+      "delay_title": "Hangup Delay:",
+      "delay_seconds": "%ds",
+      "delay_description": "Auto hangup after specified time from call connection (5-600s)"
+    },
+    "speakerphone": {
+      "title": "🔈 Auto Speakerphone",
+      "enabled": "✅ Enabled: Auto enable speaker during calls",
+      "disabled": "❌ Disabled: No auto speakerphone",
+      "description": "Auto enable speakerphone after call connects for recording and audio playback"
+    },
+    "auto_answer": {
+      "title": "📞 Answer Delay",
+      "delay_title": "Delay Time:",
+      "delay_seconds": "%ds",
+      "immediate": "Answer Immediately",
+      "description": "Wait specified time before auto answering to avoid rejection"
+    },
+    "dtmf": {
+      "title": "🎵 DTMF Tone Send",
+      "input_hint": "Enter DTMF tones to send (0-9, *, #)",
+      "send_button": "Send DTMF",
+      "description": "Send DTMF tones during call for IVR menu interaction",
+      "sent": "DTMF tones sent: %s"
+    },
+    "dial_retry": {
+      "title": "🔄 Dial Retry",
+      "count_title": "Retry Count:",
+      "count_times": "%d times",
+      "no_retry": "No Retry",
+      "description": "Number of auto retry attempts after dial failure (0-5)"
     }
   },
 
@@ -325,6 +361,7 @@
     "dialing": "Dialing %d/%d: %s",
     "waiting_connect": "Waiting for connection...",
     "recording_started": "Recording started",
+    "recording_failed": "Failed to start recording",
     "call_connected_playing": "Call connected, playing audio...",
     "call_connected_no_audio": "Call connected (no audio playback)",
     "call_ended": "Call ended",
@@ -332,11 +369,12 @@
     "all_completed": "All calls completed",
     "stopped": "Stopped",
     "resuming": "Resuming...",
+    "retrying": "Round done, retrying %d failed numbers (%d/%d)",
     "dial_failed": "Dial failed: %s",
     "no_contacts_to_export": "No contacts to export",
     "export_success": "Export successful, %d records",
     "export_failed": "Export failed: %s",
-    "statistics": "Total: %d | Success: %d | Failed: %d | Duration: %ds",
+    "statistics": "Total: %d | Success: %d | Failed: %d | Talk: %s | Dial: %s",
     "unknown": "Unknown",
     "file_format_unsupported": "Unsupported file format",
     "call_success": "Success",
@@ -350,7 +388,38 @@
     "download_failed_network": "Network connection timed out, please check your network and try again",
     "install_preparing": "Preparing to install...",
     "install_failed_hint": "Failed to start installation, please manually open the downloaded APK file: %s",
-    "csv_header": "Name,Phone,Balance,Account Number,Call Count"
+    "csv_header": "Name,Phone,Balance,Account Number,Call Count",
+    "csv_header_call_records": "Time,Direction,SIM,Phone,Name,Result,Talk,Dial,Recording Path,Channel"
+  },
+
+  "recording_library": {
+    "title": "Recordings",
+    "empty": "No recordings",
+    "play": "Play",
+    "stop": "Stop",
+    "share": "Share",
+    "delete": "Delete",
+    "open_public": "Public",
+    "deleted": "Deleted",
+    "no_public": "No public copy for this recording"
+  },
+
+  "service": {
+    "recording_title": "AUTOcall",
+    "recording_text": "Recording call"
+  },
+
+  "accessibility_diagnostics": {
+    "title": "Accessibility Self-Check",
+    "record_start": "Record button",
+    "speaker": "Speaker button",
+    "answer": "Answer button",
+    "hangup": "Hang up button",
+    "found": "✓ found",
+    "not_found": "✗ not found",
+    "refresh": "Re-check",
+    "service_disabled": "Accessibility service is off; results are unreliable. Please enable it in system settings first.",
+    "note_system_side": "Note: the accessibility channel can only tap system UI and cannot inject audio; system recordings live in a vendor private directory that this app cannot read."
   },
 
   "log": {
@@ -414,6 +483,22 @@
     "restore_audio_state_failed": "Failed to restore audio state: %s",
     "release_mediaplayer_failed": "Failed to release MediaPlayer: %s",
     "start_recording_failed": "Failed to start recording: %s",
-    "stop_recording_failed": "Failed to stop recording: %s"
+    "stop_recording_failed": "Failed to stop recording: %s",
+    "accessibility_incoming_call_detected": "Incoming call screen detected",
+    "accessibility_dialer_detected": "Dialer screen detected",
+    "accessibility_in_call_detected": "In-call screen detected",
+    "accessibility_call_ended_detected": "Call ended detected",
+    "accessibility_dial_button_clicked": "Dial button clicked",
+    "accessibility_number_entered": "Number entered: %s",
+    "accessibility_enter_number_failed": "Failed to enter number",
+    "accessibility_direct_dial": "Direct dial: %s",
+    "accessibility_direct_dial_failed": "Direct dial failed: %s",
+    "accessibility_call_connected_detected": "Call connection detected",
+    "accessibility_auto_answered": "Call auto answered",
+    "accessibility_auto_hangup_clicked": "Auto hangup performed",
+    "accessibility_hangup_button_not_found": "Hangup button not found, trying back action",
+    "accessibility_dial_retry": "Dial retry: attempt %d/%d",
+    "accessibility_dial_retry_exhausted": "Dial retry attempts exhausted: %d",
+    "load_accessibility_settings_failed": "Failed to load accessibility settings"
   }
 }

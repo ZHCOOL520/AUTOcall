@@ -101,8 +101,12 @@ object ChannelProbe {
         )
     }
 
-    fun injectorFor(context: Context, caps: Capabilities): AudioInjector = when (caps.inject) {
-        InjectionChannel.ROOT_UPLINK -> RootUplinkInjector(context)
-        else -> SpeakerLoopbackInjector(context)
+    fun injectorFor(
+        context: Context,
+        caps: Capabilities,
+        amplitudeSource: () -> Int = { 0 }
+    ): AudioInjector = when (caps.inject) {
+        InjectionChannel.ROOT_UPLINK -> RootUplinkInjector(context, amplitudeSource)
+        else -> SpeakerLoopbackInjector(context, amplitudeSource)
     }
 }

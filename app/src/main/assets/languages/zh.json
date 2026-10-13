@@ -14,6 +14,7 @@
   "main_screen": {
     "title": "自动电话拨打系统",
     "phone_list": "电话列表 (%d个)",
+    "resume_from": "从第 %d 个继续",
     "sort": {
       "call_count": "按拨打次数",
       "call_count_asc": "✓ 次数升序",
@@ -201,6 +202,41 @@
       "service_connected": "无障碍模式已连接",
       "service_interrupted": "无障碍模式被中断",
       "service_destroyed": "无障碍模式已销毁"
+    },
+    "auto_hangup": {
+      "title": "📵 自动挂断",
+      "enabled": "✅ 开启：通话达到设定时间后自动挂断",
+      "disabled": "❌ 关闭：不自动挂断",
+      "delay_title": "挂断延迟:",
+      "delay_seconds": "%d秒",
+      "delay_description": "通话接通后等待指定时间自动挂断（5-600秒）"
+    },
+    "speakerphone": {
+      "title": "🔈 自动扬声器",
+      "enabled": "✅ 开启：通话时自动开启扬声器",
+      "disabled": "❌ 关闭：不自动开启扬声器",
+      "description": "通话接通后自动开启扬声器，方便录音和音频播放"
+    },
+    "auto_answer": {
+      "title": "📞 接听延迟",
+      "delay_title": "延迟时间:",
+      "delay_seconds": "%d秒",
+      "immediate": "立即接听",
+      "description": "来电后等待指定时间再自动接听，避免被拒"
+    },
+    "dtmf": {
+      "title": "🎵 DTMF音发送",
+      "input_hint": "输入要发送的DTMF音（0-9, *, #）",
+      "send_button": "发送DTMF",
+      "description": "通话中发送DTMF音，用于IVR语音菜单交互",
+      "sent": "DTMF音已发送: %s"
+    },
+    "dial_retry": {
+      "title": "🔄 拨号重试",
+      "count_title": "重试次数:",
+      "count_times": "%d次",
+      "no_retry": "不重试",
+      "description": "拨号失败后自动重试的次数（0-5次）"
     }
   },
 
@@ -325,6 +361,7 @@
     "dialing": "正在拨打 %d/%d: %s",
     "waiting_connect": "等待接通...",
     "recording_started": "录音已启动",
+    "recording_failed": "录音启动失败",
     "call_connected_playing": "电话已接通，播放语音...",
     "call_connected_no_audio": "电话已接通（未播放音频）",
     "call_ended": "通话结束",
@@ -332,11 +369,12 @@
     "all_completed": "全部拨打完成",
     "stopped": "已停止",
     "resuming": "继续拨打...",
+    "retrying": "本轮完成，正在重拨 %d 个失败号码（第 %d/%d 轮）",
     "dial_failed": "拨打失败: %s",
     "no_contacts_to_export": "没有可导出的联系人",
     "export_success": "导出成功，共 %d 条记录",
     "export_failed": "导出失败: %s",
-    "statistics": "总计: %d | 成功: %d | 失败: %d | 总时长: %d秒",
+    "statistics": "总计: %d | 成功: %d | 失败: %d | 总通话: %s | 总拨打: %s",
     "unknown": "未知",
     "file_format_unsupported": "不支持的文件格式",
     "call_success": "成功",
@@ -350,7 +388,38 @@
     "download_failed_network": "网络连接超时，请检查网络后重试",
     "install_preparing": "正在准备安装...",
     "install_failed_hint": "安装启动失败，请在文件管理器中手动打开下载的APK文件: %s",
-    "csv_header": "姓名,手机号,余额,户号,拨打次数"
+    "csv_header": "姓名,手机号,余额,户号,拨打次数",
+    "csv_header_call_records": "时间,方向,SIM,号码,姓名,结果,通话时长,拨打耗时,录音路径,通道"
+  },
+
+  "recording_library": {
+    "title": "录音库",
+    "empty": "暂无录音",
+    "play": "播放",
+    "stop": "停止",
+    "share": "分享",
+    "delete": "删除",
+    "open_public": "公共库",
+    "deleted": "已删除",
+    "no_public": "该录音暂无公共副本"
+  },
+
+  "service": {
+    "recording_title": "AUTOcall",
+    "recording_text": "正在通话录音"
+  },
+
+  "accessibility_diagnostics": {
+    "title": "无障碍自检",
+    "record_start": "录音键",
+    "speaker": "免提键",
+    "answer": "接听键",
+    "hangup": "挂断键",
+    "found": "✓ 找到",
+    "not_found": "✗ 未找到",
+    "refresh": "重新检测",
+    "service_disabled": "无障碍服务未开启，检测结果不可靠。请先在系统设置中开启。",
+    "note_system_side": "说明：无障碍通道只能点击系统界面，无法注入音频；系统录音件保存在厂商私有目录，本 App 无法读取。"
   },
 
   "log": {
@@ -414,6 +483,22 @@
     "restore_audio_state_failed": "恢复音频状态失败: %s",
     "release_mediaplayer_failed": "释放 MediaPlayer 失败: %s",
     "start_recording_failed": "启动录音失败: %s",
-    "stop_recording_failed": "停止录音失败: %s"
+    "stop_recording_failed": "停止录音失败: %s",
+    "accessibility_incoming_call_detected": "检测到来电界面",
+    "accessibility_dialer_detected": "检测到拨号界面",
+    "accessibility_in_call_detected": "检测到通话中界面",
+    "accessibility_call_ended_detected": "检测到通话结束",
+    "accessibility_dial_button_clicked": "已点击拨号按钮",
+    "accessibility_number_entered": "已输入号码: %s",
+    "accessibility_enter_number_failed": "输入号码失败",
+    "accessibility_direct_dial": "直接拨号: %s",
+    "accessibility_direct_dial_failed": "直接拨号失败: %s",
+    "accessibility_call_connected_detected": "检测到通话已接通",
+    "accessibility_auto_answered": "已自动接听来电",
+    "accessibility_auto_hangup_clicked": "已自动挂断",
+    "accessibility_hangup_button_not_found": "未找到挂断按钮，尝试返回操作",
+    "accessibility_dial_retry": "拨号重试中: 第%d次/共%d次",
+    "accessibility_dial_retry_exhausted": "拨号重试次数已用完: %d次",
+    "load_accessibility_settings_failed": "加载无障碍设置失败"
   }
 }

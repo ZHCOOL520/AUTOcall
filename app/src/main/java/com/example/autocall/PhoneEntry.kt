@@ -32,7 +32,8 @@ data class CallRecord(
     val simSlot: Int = 0,
     val callStatus: String = "",
     val resultCode: String = "fail",
-    val callDuration: Long = 0,
+    val callDuration: Long = 0,             // 真实通话时长（秒，接通→挂断）
+    val dialDuration: Long = 0,             // 总拨打耗时（秒，拨号→挂断，修 B42 区分两个时长）
     val timestamp: String = "",
     val connectedAtMs: Long = 0,
     val recordFilePath: String? = null,

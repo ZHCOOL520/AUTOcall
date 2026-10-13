@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="cache" path="." />
+    <!-- 供录音库分享（ACTION_SEND）私有目录下的录音文件 -->
+    <external-files-path name="external_files" path="." />
 </paths>
